@@ -1,0 +1,62 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Usuario del sistema
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique @db.VarChar(255)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  name         String?  @db.VarChar(100)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relación con skills
+  skills       Skill[]
+
+  @@map("users")
+}
+
+/// Habilidad en el sistema S.M.A.E.
+model Skill {
+  id            String   @id
+  name          String   @db.VarChar(100)
+  category      String   @db.VarChar(50)
+  level         Int      @default(0)
+  lastPracticed BigInt?  @map("last_practiced")
+  wip           Boolean  @default(false)
+  x             Float
+  y             Float
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relación con usuario
+  userId        String?  @map("user_id")
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Relaciones de dependencias
+  requirements  SkillRequirement[] @relation("SkillRequirements")
+  dependents    SkillRequirement[] @relation("SkillDependents")
+
+  @@map("skills")
+}
+
+/// Tabla de relación para dependencias entre skills
+model SkillRequirement {
+  skillId       String @map("skill_id")
+  requirementId String @map("requirement_id")
+
+  skill         Skill @relation("SkillRequirements", fields: [skillId], references: [id], onDelete: Cascade)
+  requirement   Skill @relation("SkillDependents", fields: [requirementId], references: [id], onDelete: Cascade)
+
+  @@id([skillId, requirementId])
+  @@map("skill_requirements")
+}
