@@ -193,6 +193,17 @@ export function ValidationPanel({ skillId, currentLevel, onLevelChange }: Valida
                         {LEVEL_INFO[attemptLevel]?.description}
                     </p>
 
+                    <div className="flex justify-between items-center mb-1">
+                        <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">
+                            Tu Evidencia
+                        </label>
+                        {!aiAnalysis && evidence.length > 5 && evidence.length <= 20 && (
+                            <span className="text-[10px] text-indigo-400 animate-pulse">
+                                Escribe {21 - evidence.length} chars más para IA
+                            </span>
+                        )}
+                    </div>
+
                     <div className="relative">
                         <textarea
                             value={evidence}
@@ -213,10 +224,11 @@ export function ValidationPanel({ skillId, currentLevel, onLevelChange }: Valida
                             <button
                                 onClick={handleAIAnalysis}
                                 disabled={isAnalyzing}
-                                className="absolute bottom-3 right-3 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg transition-all group"
+                                className="absolute bottom-3 right-3 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-900/40 transition-all group flex items-center gap-2"
                                 title="Consultar Asistente de IA SMAE"
                             >
-                                {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} className="group-hover:scale-110 transition-transform" />}
+                                {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} className="group-hover:scale-110 transition-transform" />}
+                                <span className="text-[10px] font-bold uppercase">Analizar con IA</span>
                             </button>
                         )}
                     </div>
@@ -332,8 +344,6 @@ export function ValidationPanel({ skillId, currentLevel, onLevelChange }: Valida
                                         onLevelChange?.();
                                     }
                                 } else {
-                                    // Si no hay validaciones registradas (migración antigua), 
-                                    // el backend debería manejarlo o podemos mostrar error
                                     alert('No se encontró una validación reciente para revertir. Contacta soporte.');
                                 }
                             }
@@ -352,4 +362,3 @@ export function ValidationPanel({ skillId, currentLevel, onLevelChange }: Valida
         </div>
     );
 }
-
