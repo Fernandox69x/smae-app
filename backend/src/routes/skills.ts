@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { prisma } from '../index';
 import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { hasCycle } from '../utils/graph';
 
 const router = Router();
 
@@ -82,7 +83,15 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
  */
 router.post('/', async (req: AuthRequest, res: Response) => {
     try {
-        const { id, name, category, level = 0, wip = false, requirements = [], x, y } = req.body;
+        const { id, name, category, level = 0, wip = false, requirements = [], x, y, isHito = false, isReinforcement = false, parentSkillId = null } = req.body;
+
+        // Validar ciclos
+        if (requirements.length > 0) {
+            const cycleDetected = await hasCycle(id, requirements, req.userId as string);
+            if (cycleDetected) {
+                return res.status(400).json({ error: 'Se detectó un ciclo en las dependencias. No puedes depender de ti mismo o crear una cadena circular.' });
+            }
+        }
 
         const skill = await prisma.skill.create({
             data: {
@@ -90,16 +99,20 @@ router.post('/', async (req: AuthRequest, res: Response) => {
                 name,
                 category,
                 level,
+                currentLevel: level > 0 ? Math.min(level, 4) : 1,
                 wip,
                 x,
                 y,
+                isHito,
+                isReinforcement,
+                parentSkillId,
                 userId: req.userId,
                 requirements: {
                     create: requirements.map((reqId: string) => ({
                         requirementId: reqId
                     }))
                 }
-            },
+            } as any,
             include: {
                 requirements: { select: { requirementId: true } }
             }
@@ -122,7 +135,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 router.put('/:id', async (req: AuthRequest, res: Response) => {
     try {
         const id = req.params.id as string;
-        const { name, category, level, lastPracticed, wip, requirements, x, y } = req.body;
+        const { name, category, level, lastPracticed, wip, requirements, x, y, isHito, isReinforcement, parentSkillId } = req.body;
 
         // Verificar que la skill pertenece al usuario
         const existing = await prisma.skill.findFirst({
@@ -131,6 +144,14 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 
         if (!existing) {
             return res.status(404).json({ error: 'Skill no encontrada' });
+        }
+
+        // Validar ciclos si hay nuevos requirements
+        if (requirements && requirements.length > 0) {
+            const cycleDetected = await hasCycle(id, requirements, req.userId as string);
+            if (cycleDetected) {
+                return res.status(400).json({ error: 'Se detectó un ciclo en las dependencias. No puedes crear una cadena circular.' });
+            }
         }
 
         // Si se actualizan requirements, primero eliminar los existentes
@@ -145,11 +166,14 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
             data: {
                 ...(name && { name }),
                 ...(category && { category }),
-                ...(level !== undefined && { level }),
+                ...(level !== undefined && { level, currentLevel: level > 0 ? Math.min(level, 4) : 1 }),
                 ...(lastPracticed !== undefined && { lastPracticed: lastPracticed ? BigInt(lastPracticed) : null }),
                 ...(wip !== undefined && { wip }),
                 ...(x !== undefined && { x }),
                 ...(y !== undefined && { y }),
+                ...(isHito !== undefined && { isHito }),
+                ...(isReinforcement !== undefined && { isReinforcement }),
+                ...(parentSkillId !== undefined && { parentSkillId }),
                 ...(requirements && {
                     requirements: {
                         create: requirements.map((reqId: string) => ({
@@ -166,7 +190,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
         res.json({
             ...skill,
             lastPracticed: skill.lastPracticed ? Number(skill.lastPracticed) : null,
-            requirements: skill.requirements.map(r => r.requirementId)
+            requirements: (skill as any).requirements?.map((r: any) => r.requirementId) || []
         });
     } catch (error) {
         console.error('Error updating skill:', error);

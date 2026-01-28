@@ -4,6 +4,8 @@ import { PrismaClient } from '@prisma/client';
 import skillRoutes from './routes/skills';
 import authRoutes from './routes/auth';
 import validationRoutes from './routes/validations';
+import aiRoutes from './routes/ai';
+import { NotificationService } from './services/notificationService';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -38,12 +40,16 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/skills', skillRoutes);
 app.use('/api/validations', validationRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error(err.stack);
     res.status(500).json({ error: 'Internal server error' });
 });
+
+// Initialize external services
+NotificationService.init();
 
 // Start server
 app.listen(PORT, () => {

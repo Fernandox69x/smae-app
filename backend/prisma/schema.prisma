@@ -38,6 +38,11 @@ model Skill {
   isActive      Boolean  @default(false) @map("is_active") // Max 3 activas
   failCount     Int      @default(0) @map("fail_count") // Para nodo refuerzo
   
+  // Atributos de Roadmap y Refuerzo
+  isReinforcement Boolean @default(false) @map("is_reinforcement")
+  isHito          Boolean @default(false) @map("is_hito") // Hito / Proyecto integrador
+  parentSkillId   String? @map("parent_skill_id") // Para vincular refuerzo con su origen
+  
   // Campos legacy (mantener compatibilidad)
   level         Int      @default(0)
   lastPracticed BigInt?  @map("last_practiced")
@@ -105,6 +110,7 @@ model Validation {
   passed      Boolean   @default(false)
   attemptedAt DateTime  @default(now()) @map("attempted_at")
   passedAt    DateTime? @map("passed_at")
+  notified    Boolean   @default(false)
   
   // Cooldown para L4 (48h)
   cooldownEnd DateTime? @map("cooldown_end")

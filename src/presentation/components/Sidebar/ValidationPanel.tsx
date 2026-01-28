@@ -31,7 +31,7 @@ interface ValidationPanelProps {
 /**
  * Panel de validación para sistema anti-autoengaño
  */
-export function ValidationPanel({ skillId, currentLevel, skillName, onLevelChange }: ValidationPanelProps) {
+export function ValidationPanel({ skillId, currentLevel, onLevelChange }: ValidationPanelProps) {
     const {
         validations,
         cooldownStatus,
@@ -40,17 +40,34 @@ export function ValidationPanel({ skillId, currentLevel, skillName, onLevelChang
         fetchValidations,
         checkCooldown,
         submitValidation,
-        triggerPanic
+        triggerPanic,
+        analyzeEvidence,
+        getAISuggestions
     } = useValidations(skillId);
 
     const [showForm, setShowForm] = useState(false);
     const [evidence, setEvidence] = useState('');
     const [attemptLevel, setAttemptLevel] = useState(currentLevel + 1);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [aiAnalysis, setAiAnalysis] = useState<any>(null);
 
     useEffect(() => {
         fetchValidations();
         checkCooldown();
     }, [fetchValidations, checkCooldown]);
+
+    const handleAIAnalysis = async () => {
+        if (!evidence.trim()) return;
+        setIsAnalyzing(true);
+        try {
+            const result = await analyzeEvidence(attemptLevel, LEVEL_INFO[attemptLevel].name, evidence);
+            setAiAnalysis(result);
+        } catch (err) {
+            console.error('Error in AI analysis:', err);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     // Calcular siguiente nivel disponible
     const nextLevel = Math.min(currentLevel + 1, 4);
@@ -124,20 +141,45 @@ export function ValidationPanel({ skillId, currentLevel, skillName, onLevelChang
 
             {/* Botón para intentar validación */}
             {!showForm && currentLevel < 4 && (
-                <button
-                    onClick={() => {
-                        setAttemptLevel(nextLevel);
-                        setShowForm(true);
-                    }}
-                    disabled={!canAttempt || isLoading}
-                    className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${canAttempt && !isLoading
-                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                        : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                        }`}
-                >
-                    <ArrowUp size={18} />
-                    Intentar {LEVEL_INFO[nextLevel]?.label}
-                </button>
+                <div className="space-y-3">
+                    <button
+                        onClick={() => {
+                            setAttemptLevel(nextLevel);
+                            setShowForm(true);
+                        }}
+                        disabled={!canAttempt || isLoading}
+                        className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${canAttempt && !isLoading
+                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg'
+                            : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                            }`}
+                    >
+                        <ArrowUp size={18} />
+                        Intentar {LEVEL_INFO[nextLevel]?.label}
+                    </button>
+
+                    {currentLevel === 0 && (
+                        <button
+                            onClick={async () => {
+                                setIsAnalyzing(true);
+                                const suggestions = await getAISuggestions();
+                                if (suggestions) {
+                                    setAiAnalysis({
+                                        passed: true,
+                                        score: 10,
+                                        feedback: `Plan de estudio generado (${suggestions.estimatedTime}):`,
+                                        suggestions: suggestions.steps.map((s: any) => `${s.action}: ${s.details}`)
+                                    });
+                                }
+                                setIsAnalyzing(false);
+                            }}
+                            disabled={isAnalyzing || isLoading}
+                            className="w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                        >
+                            {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} fill="currentColor" />}
+                            Generar Plan de Estudio (IA)
+                        </button>
+                    )}
+                </div>
             )}
 
             {/* Formulario de validación */}
@@ -151,20 +193,54 @@ export function ValidationPanel({ skillId, currentLevel, skillName, onLevelChang
                         {LEVEL_INFO[attemptLevel]?.description}
                     </p>
 
-                    <textarea
-                        value={evidence}
-                        onChange={(e) => setEvidence(e.target.value)}
-                        placeholder={
-                            attemptLevel === 1
-                                ? "Explica el concepto en una sola frase simple..."
-                                : attemptLevel === 2
-                                    ? "¿Qué guía/tutorial seguiste? ¿Cómo te fue?"
-                                    : attemptLevel === 3
-                                        ? "Describe cómo lo lograste sin ayuda..."
-                                        : "Explica el PORQUÉ de cada paso..."
-                        }
-                        className="w-full h-24 bg-slate-900 border border-slate-700 rounded-lg p-3 text-white text-sm resize-none focus:border-emerald-500 focus:outline-none"
-                    />
+                    <div className="relative">
+                        <textarea
+                            value={evidence}
+                            onChange={(e) => setEvidence(e.target.value)}
+                            placeholder={
+                                attemptLevel === 1
+                                    ? "Explica el concepto en una sola frase simple..."
+                                    : attemptLevel === 2
+                                        ? "¿Qué guía/tutorial seguiste? ¿Cómo te fue?"
+                                        : attemptLevel === 3
+                                            ? "Describe cómo lo lograste sin ayuda..."
+                                            : "Explica el PORQUÉ de cada paso..."
+                            }
+                            className={`w-full h-32 bg-slate-900 border ${aiAnalysis ? 'border-indigo-500/50' : 'border-slate-700'} rounded-lg p-3 text-white text-sm resize-none focus:border-emerald-500 focus:outline-none transition-all`}
+                        />
+
+                        {evidence.length > 20 && !aiAnalysis && (
+                            <button
+                                onClick={handleAIAnalysis}
+                                disabled={isAnalyzing}
+                                className="absolute bottom-3 right-3 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg transition-all group"
+                                title="Consultar Asistente de IA SMAE"
+                            >
+                                {isAnalyzing ? <Loader2 size={16} className="animate-spin" /> : <Zap size={16} className="group-hover:scale-110 transition-transform" />}
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Feedback de la IA */}
+                    {aiAnalysis && (
+                        <div className={`mt-3 p-3 rounded-lg border text-xs animate-in fade-in slide-in-from-top-1 duration-300 ${aiAnalysis.passed ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300' : 'bg-orange-500/10 border-orange-500/30 text-orange-300'
+                            }`}>
+                            <div className="flex justify-between items-start mb-2">
+                                <span className="font-bold flex items-center gap-1">
+                                    <Zap size={12} fill="currentColor" /> Análisis del Asistente IA: {aiAnalysis.score}/10
+                                </span>
+                                <button onClick={() => setAiAnalysis(null)} className="text-slate-500 hover:text-white">✕</button>
+                            </div>
+                            <p className="mb-2 leading-relaxed">{aiAnalysis.feedback}</p>
+                            {aiAnalysis.suggestions && aiAnalysis.suggestions.length > 0 && (
+                                <ul className="space-y-1 list-disc pl-4 opacity-80">
+                                    {aiAnalysis.suggestions.map((s: string, i: number) => (
+                                        <li key={i}>{s}</li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+                    )}
 
                     <div className="flex gap-2 mt-4">
                         <button

@@ -30,6 +30,7 @@ export function SkillFormModal({ isOpen, onClose, editingSkill }: SkillFormModal
         x: 50,
         y: 50,
         requirements: [] as string[],
+        isHito: false,
     });
     const [newCategory, setNewCategory] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,6 +46,7 @@ export function SkillFormModal({ isOpen, onClose, editingSkill }: SkillFormModal
                 x: editingSkill.x,
                 y: editingSkill.y,
                 requirements: editingSkill.requirements,
+                isHito: (editingSkill as any).isHito ?? false,
             });
         } else {
             setFormData({
@@ -54,6 +56,7 @@ export function SkillFormModal({ isOpen, onClose, editingSkill }: SkillFormModal
                 x: 50,
                 y: 50,
                 requirements: [],
+                isHito: false,
             });
         }
         setError(null);
@@ -76,7 +79,7 @@ export function SkillFormModal({ isOpen, onClose, editingSkill }: SkillFormModal
                 return;
             }
 
-            const data: Omit<SkillData, 'lastPracticed'> = {
+            const data: any = {
                 id: formData.id || formData.name.toLowerCase().replace(/\s+/g, '_'),
                 name: formData.name,
                 category,
@@ -85,6 +88,7 @@ export function SkillFormModal({ isOpen, onClose, editingSkill }: SkillFormModal
                 requirements: formData.requirements,
                 x: formData.x,
                 y: formData.y,
+                isHito: formData.isHito,
             };
 
             let result;
@@ -95,6 +99,7 @@ export function SkillFormModal({ isOpen, onClose, editingSkill }: SkillFormModal
                     x: data.x,
                     y: data.y,
                     requirements: data.requirements,
+                    isHito: data.isHito,
                 });
             } else {
                 result = await createSkill(data);
@@ -177,6 +182,26 @@ export function SkillFormModal({ isOpen, onClose, editingSkill }: SkillFormModal
                             className="w-full mt-2 bg-slate-950 border border-slate-800 rounded-lg p-3 text-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none"
                             placeholder="O escribe una nueva categoría..."
                         />
+                    </div>
+
+                    {/* Checkbox Hito */}
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                        <label className="flex items-center gap-3 cursor-pointer group">
+                            <input
+                                type="checkbox"
+                                checked={formData.isHito}
+                                onChange={e => setFormData({ ...formData, isHito: e.target.checked })}
+                                className="w-5 h-5 rounded border-slate-700 text-amber-500 focus:ring-amber-500 bg-slate-900"
+                            />
+                            <div>
+                                <span className="block text-sm font-bold text-slate-200 group-hover:text-amber-400 transition-colors">
+                                    Hito del Roadmap (Milestone)
+                                </span>
+                                <span className="block text-[10px] text-slate-500">
+                                    Marcar como un punto de control o proyecto integrador importante.
+                                </span>
+                            </div>
+                        </label>
                     </div>
 
                     {/* Dependencias */}

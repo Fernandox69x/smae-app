@@ -111,17 +111,44 @@ router.post('/', async (req: AuthRequest, res: Response) => {
             // Si falló, incrementar failCount
             const newFailCount = skill.failCount + 1;
 
-            // Si falla 3 veces, sugerir nodo de refuerzo
-            if (newFailCount >= 3) {
+            // Si falla 3 veces en L3, generar automáticamente un nodo de refuerzo
+            if (newFailCount >= 3 && level === 3) {
+                const reinforcementId = `reinforce-${skill.id}-${Date.now()}`;
+
+                // Crear la skill de refuerzo
+                await prisma.skill.create({
+                    data: {
+                        id: reinforcementId,
+                        name: `Refuerzo: ${skill.name}`,
+                        category: skill.category,
+                        currentLevel: 1,
+                        level: 1,
+                        x: skill.x - 150, // Posicionarlo a la izquierda
+                        y: skill.y + 100,
+                        isReinforcement: true,
+                        parentSkillId: skill.id,
+                        userId: req.userId as string,
+                    } as any
+                });
+
+                // Poner el refuerzo como requerimiento de la skill original
+                await prisma.skillRequirement.create({
+                    data: {
+                        skillId: skill.id,
+                        requirementId: reinforcementId
+                    }
+                });
+
                 await prisma.skill.update({
                     where: { id: skillId },
                     data: { failCount: newFailCount }
                 });
 
-                return res.status(200).json({
+                return res.status(201).json({
                     validation,
-                    suggestion: 'Has fallado 3 veces. Considera agregar un nodo de refuerzo.',
-                    failCount: newFailCount
+                    suggestion: 'Has fallado 3 veces en la Prueba Fría. Se ha generado un nodo de refuerzo obligatorio.',
+                    failCount: newFailCount,
+                    reinforcementCreated: true
                 });
             }
 
@@ -192,6 +219,7 @@ router.put('/:id/panic', async (req: AuthRequest, res: Response) => {
         });
 
         res.json({
+            success: true,
             message: 'Nivel retrocedido por honestidad brutal',
             newLevel
         });

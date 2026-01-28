@@ -45,9 +45,21 @@ export function SkillSidebar({ onLevelUpClick, onEditClick }: SkillSidebarProps)
                 {/* Header Nodo */}
                 <div className="flex items-start justify-between mb-6">
                     <div>
-                        <span className="text-xs font-mono text-emerald-500 uppercase tracking-wider">
-                            {selectedSkill.category}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-mono text-emerald-500 uppercase tracking-wider">
+                                {selectedSkill.category}
+                            </span>
+                            {(selectedSkill as any).isHito && (
+                                <span className="bg-amber-500/10 border border-amber-500/50 text-amber-500 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase">
+                                    Hito
+                                </span>
+                            )}
+                            {(selectedSkill as any).isReinforcement && (
+                                <span className="bg-red-500/10 border border-red-500/50 text-red-500 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase">
+                                    Refuerzo
+                                </span>
+                            )}
+                        </div>
                         <h2 className="text-2xl font-bold text-white leading-tight mt-1">
                             {selectedSkill.name}
                         </h2>

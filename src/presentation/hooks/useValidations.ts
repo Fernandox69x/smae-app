@@ -32,7 +32,7 @@ export function useValidations(skillId?: string) {
     const [error, setError] = useState<string | null>(null);
 
     const getAuthHeaders = () => {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('smae_token');
         return {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
@@ -160,6 +160,58 @@ export function useValidations(skillId?: string) {
         }
     }, [fetchValidations]);
 
+    /**
+     * Pedir a la IA que analice la evidencia antes de enviarla
+     */
+    const analyzeEvidence = useCallback(async (
+        level: number,
+        evidenceType: string,
+        evidenceContent: string
+    ) => {
+        if (!skillId) return null;
+        setIsLoading(true);
+
+        try {
+            const response = await fetch(`${API_URL}/ai/analyze-evidence`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify({
+                    skillId,
+                    level,
+                    evidenceType,
+                    evidenceContent
+                })
+            });
+
+            if (!response.ok) throw new Error('Error en el análisis de IA');
+            return await response.json();
+        } catch (err) {
+            console.error('AI Analysis error:', err);
+            return null;
+        } finally {
+            setIsLoading(false);
+        }
+    }, [skillId]);
+
+    /**
+     * Obtener sugerencias de pasos de aprendizaje de la IA
+     */
+    const getAISuggestions = useCallback(async () => {
+        if (!skillId) return null;
+
+        try {
+            const response = await fetch(`${API_URL}/ai/suggest-steps/${skillId}`, {
+                headers: getAuthHeaders()
+            });
+
+            if (!response.ok) throw new Error('Error al obtener sugerencias');
+            return await response.json();
+        } catch (err) {
+            console.error('AI Suggestions error:', err);
+            return null;
+        }
+    }, [skillId]);
+
     return {
         validations,
         cooldownStatus,
@@ -168,6 +220,8 @@ export function useValidations(skillId?: string) {
         fetchValidations,
         checkCooldown,
         submitValidation,
-        triggerPanic
+        triggerPanic,
+        analyzeEvidence,
+        getAISuggestions
     };
 }

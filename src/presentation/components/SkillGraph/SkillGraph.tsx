@@ -101,6 +101,7 @@ export function SkillGraph() {
                             // Usar currentLevel si existe, sino level
                             const parentLevel = (parent as any).currentLevel ?? parent.level;
                             const childLevel = (skill as any).currentLevel ?? skill.level;
+                            const isParentReinforcement = (parent as any).isReinforcement ?? false;
 
                             // Estados de la dependencia
                             const parentCompleted = parentLevel >= 4; // Padre en maestría
@@ -112,7 +113,11 @@ export function SkillGraph() {
                             let strokeOpacity = 0.2;
                             let strokeDash = '5,5';
 
-                            if (parentCompleted) {
+                            if (isParentReinforcement) {
+                                lineStroke = parentCompleted ? '#ef4444' : '#f87171'; // Rojo sólido si pasó, tenue si no
+                                strokeOpacity = parentCompleted ? 0.6 : 0.4;
+                                strokeDash = parentCompleted ? '0' : '3,3';
+                            } else if (parentCompleted) {
                                 lineStroke = '#10b981'; // Verde - desbloqueado
                                 strokeOpacity = 0.6;
                                 strokeDash = '0';

@@ -24,6 +24,12 @@ export interface SkillData {
     name: string;
     category: string;
     level: number;
+    currentLevel?: number;
+    isActive?: boolean;
+    failCount?: number;
+    isHito?: boolean;
+    isReinforcement?: boolean;
+    parentSkillId?: string | null;
     lastPracticed: number | null;
     wip: boolean;
     requirements: string[];

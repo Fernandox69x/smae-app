@@ -12,6 +12,12 @@ export class Skill {
     private _level: number;
     private _lastPracticed: number | null;
     private _wip: boolean;
+    readonly currentLevel: number;
+    readonly isActive: boolean;
+    readonly failCount: number;
+    readonly isHito: boolean;
+    readonly isReinforcement: boolean;
+    readonly parentSkillId: string | null;
     readonly requirements: string[];
     x: number;
     y: number;
@@ -21,6 +27,12 @@ export class Skill {
         this.name = data.name;
         this.category = data.category;
         this._level = data.level;
+        this.currentLevel = data.currentLevel ?? (data.level > 0 ? Math.min(data.level, 4) : 1);
+        this.isActive = data.isActive ?? data.wip;
+        this.failCount = data.failCount ?? 0;
+        this.isHito = data.isHito ?? false;
+        this.isReinforcement = data.isReinforcement ?? false;
+        this.parentSkillId = data.parentSkillId ?? null;
         this._lastPracticed = data.lastPracticed;
         this._wip = data.wip;
         this.requirements = data.requirements;
@@ -159,6 +171,12 @@ export class Skill {
             name: this.name,
             category: this.category,
             level: this._level,
+            currentLevel: this.currentLevel,
+            isActive: this.isActive,
+            failCount: this.failCount,
+            isHito: this.isHito,
+            isReinforcement: this.isReinforcement,
+            parentSkillId: this.parentSkillId,
             lastPracticed: this._lastPracticed,
             wip: this._wip,
             requirements: this.requirements,
