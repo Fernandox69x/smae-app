@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Lock, ArrowLeft, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { config } from '../../config';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = config.API_URL;
 
 /**
  * Página para restablecer contraseña con token

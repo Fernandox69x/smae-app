@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Mail, ArrowLeft, Loader2, CheckCircle2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { config } from '../../config';
 
-const API_URL = 'http://localhost:3001/api';
+const API_URL = config.API_URL;
 
 /**
  * Página para solicitar recuperación de contraseña

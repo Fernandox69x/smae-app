@@ -2,8 +2,9 @@ import { ISkillRepository } from '@domain/interfaces/ISkillRepository';
 import { Skill } from '@domain/entities/Skill';
 import { SkillData } from '@domain/types';
 import { getAuthToken } from '@presentation/context/AuthContext';
+import { config } from '../../config';
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = config.API_URL;
 
 /**
  * Helper para obtener headers con auth
