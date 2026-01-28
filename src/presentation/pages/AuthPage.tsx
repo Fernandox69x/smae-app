@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogIn, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 
@@ -134,6 +135,18 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
                                 </>
                             )}
                         </button>
+
+                        {/* Link de olvidé mi contraseña (solo en login) */}
+                        {isLogin && (
+                            <div className="text-center">
+                                <Link
+                                    to="/forgot-password"
+                                    className="text-slate-500 hover:text-emerald-400 text-sm transition-colors"
+                                >
+                                    ¿Olvidaste tu contraseña?
+                                </Link>
+                            </div>
+                        )}
                     </form>
 
                     {/* Toggle */}

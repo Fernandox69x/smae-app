@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@presentation/context/AuthContext';
 import { SkillProvider, useSkillContext } from '@presentation/context/SkillContext';
 import { Header } from '@presentation/components/Header';
@@ -7,6 +8,8 @@ import { SkillSidebar } from '@presentation/components/Sidebar/SkillSidebar';
 import { EvidenceModal } from '@presentation/components/Modal/EvidenceModal';
 import { SkillFormModal } from '@presentation/components/Modal/SkillFormModal';
 import { AuthPage } from '@presentation/pages/AuthPage';
+import { ForgotPasswordPage } from '@presentation/pages/ForgotPasswordPage';
+import { ResetPasswordPage } from '@presentation/pages/ResetPasswordPage';
 import { Loader2, LogOut, User } from 'lucide-react';
 
 /**
@@ -125,9 +128,9 @@ function MainApp() {
 }
 
 /**
- * Contenedor con lógica de autenticación
+ * Contenedor con lógica de autenticación y rutas
  */
-function AppWithAuth() {
+function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
 
     if (isLoading) {
@@ -138,14 +141,39 @@ function AppWithAuth() {
         );
     }
 
-    if (!isAuthenticated) {
-        return <AuthPage onSuccess={() => window.location.reload()} />;
-    }
-
     return (
-        <SkillProvider>
-            <MainApp />
-        </SkillProvider>
+        <Routes>
+            {/* Rutas públicas de password recovery */}
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+            {/* Ruta de login */}
+            <Route
+                path="/login"
+                element={
+                    isAuthenticated
+                        ? <Navigate to="/" replace />
+                        : <AuthPage onSuccess={() => window.location.href = '/'} />
+                }
+            />
+
+            {/* Ruta principal (protegida) */}
+            <Route
+                path="/"
+                element={
+                    isAuthenticated
+                        ? (
+                            <SkillProvider>
+                                <MainApp />
+                            </SkillProvider>
+                        )
+                        : <Navigate to="/login" replace />
+                }
+            />
+
+            {/* Redirect cualquier otra ruta */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
     );
 }
 
@@ -154,8 +182,10 @@ function AppWithAuth() {
  */
 export default function App() {
     return (
-        <AuthProvider>
-            <AppWithAuth />
-        </AuthProvider>
+        <BrowserRouter>
+            <AuthProvider>
+                <AppRoutes />
+            </AuthProvider>
+        </BrowserRouter>
     );
 }
