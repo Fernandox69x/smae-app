@@ -8,9 +8,22 @@ const app = express();
 const prisma = new PrismaClient();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
+// CORS: permitir frontend en desarrollo y producción
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://smae-app.vercel.app',
+    process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-    origin: 'http://localhost:5173', // Frontend Vite
+    origin: (origin, callback) => {
+        // Permitir requests sin origin (como Postman) o si está en la lista
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 app.use(express.json());
