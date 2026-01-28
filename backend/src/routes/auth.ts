@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import * as crypto from 'node:crypto';
 import { prisma } from '../index';
 import { authMiddleware, generateToken, AuthRequest } from '../middleware/auth';
 
@@ -132,6 +133,121 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
     } catch (error) {
         console.error('Error obteniendo usuario:', error);
         res.status(500).json({ error: 'Error al obtener usuario' });
+    }
+});
+
+/**
+ * POST /api/auth/forgot-password
+ * Solicitar recuperación de contraseña
+ */
+router.post('/forgot-password', async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email es obligatorio' });
+        }
+
+        // Buscar usuario (no revelar si existe o no por seguridad)
+        const user = await prisma.user.findUnique({
+            where: { email: email.toLowerCase() }
+        });
+
+        // Siempre responder igual para evitar enumeration attacks
+        const successMessage = { message: 'Si el email existe, recibirás un enlace de recuperación' };
+
+        if (!user) {
+            return res.json(successMessage);
+        }
+
+        // Generar token seguro (64 bytes = 128 chars hex)
+        const token = crypto.randomBytes(64).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+        // Expiración: 1 hora
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+        // Invalidar tokens anteriores del usuario
+        await prisma.passwordResetToken.updateMany({
+            where: { userId: user.id, usedAt: null },
+            data: { usedAt: new Date() }
+        });
+
+        // Crear nuevo token
+        await prisma.passwordResetToken.create({
+            data: {
+                tokenHash,
+                userId: user.id,
+                expiresAt,
+            }
+        });
+
+        // Enviar email
+        const { sendPasswordResetEmail } = await import('../services/emailService');
+        await sendPasswordResetEmail(user.email, token, user.name || undefined);
+
+        res.json(successMessage);
+    } catch (error) {
+        console.error('Error en forgot-password:', error);
+        res.status(500).json({ error: 'Error al procesar solicitud' });
+    }
+});
+
+/**
+ * POST /api/auth/reset-password
+ * Restablecer contraseña con token
+ */
+router.post('/reset-password', async (req: Request, res: Response) => {
+    try {
+        const { token, newPassword } = req.body;
+
+        if (!token || !newPassword) {
+            return res.status(400).json({ error: 'Token y nueva contraseña son obligatorios' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'La contraseña debe tener al menos 6 caracteres' });
+        }
+
+        // Hash del token recibido
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+
+        // Buscar token válido
+        const resetToken = await prisma.passwordResetToken.findUnique({
+            where: { tokenHash },
+            include: { user: true }
+        });
+
+        if (!resetToken) {
+            return res.status(400).json({ error: 'Token inválido o expirado' });
+        }
+
+        if (resetToken.usedAt) {
+            return res.status(400).json({ error: 'Este enlace ya fue utilizado' });
+        }
+
+        if (resetToken.expiresAt < new Date()) {
+            return res.status(400).json({ error: 'El enlace ha expirado. Solicita uno nuevo.' });
+        }
+
+        // Actualizar contraseña
+        const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+
+        await prisma.$transaction([
+            prisma.user.update({
+                where: { id: resetToken.userId },
+                data: { passwordHash }
+            }),
+            prisma.passwordResetToken.update({
+                where: { id: resetToken.id },
+                data: { usedAt: new Date() }
+            })
+        ]);
+
+        res.json({ message: 'Contraseña actualizada correctamente' });
+    } catch (error) {
+        console.error('Error en reset-password:', error);
+        res.status(500).json({ error: 'Error al restablecer contraseña' });
     }
 });
 
