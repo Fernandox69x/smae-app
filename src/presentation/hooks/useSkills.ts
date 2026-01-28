@@ -26,6 +26,7 @@ export function useSkills() {
         createSkill: context.createSkill,
         updateSkill: context.updateSkill,
         deleteSkill: context.deleteSkill,
+        toggleActivate: context.toggleActivate,
     };
 }
 
@@ -33,7 +34,7 @@ export function useSkills() {
  * Hook para la skill seleccionada
  */
 export function useSelectedSkill() {
-    const { selectedSkillId, getSkillById, canSkillLevelUp, getRequirementsInfo, getCooldownInfo, debugFastForward, deleteSkill, refreshSkills } = useSkillContext();
+    const { selectedSkillId, getSkillById, canSkillLevelUp, getRequirementsInfo, getCooldownInfo, debugFastForward, deleteSkill, refreshSkills, toggleActivate } = useSkillContext();
 
     const selectedSkill = useMemo(() => {
         if (!selectedSkillId) return null;
@@ -89,6 +90,7 @@ export function useSelectedSkill() {
         fastForward,
         deleteSkill: handleDelete,
         refreshSkills,
+        toggleActivate,
     };
 }
 

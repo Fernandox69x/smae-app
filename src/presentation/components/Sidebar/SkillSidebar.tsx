@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Crown, Lock, Edit2, Trash2 } from 'lucide-react';
+import { BookOpen, Crown, Lock, Edit2, Trash2, Zap } from 'lucide-react';
 import { useSelectedSkill, useSkills } from '../../hooks/useSkills';
 import { StatusCard } from './StatusCard';
 import { ValidationPanel } from './ValidationPanel';
@@ -13,7 +13,7 @@ interface SkillSidebarProps {
  * Sidebar con detalles de la skill seleccionada
  */
 export function SkillSidebar({ onLevelUpClick, onEditClick }: SkillSidebarProps) {
-    const { selectedSkill, levelInfo, nextLevelInfo, requirementsInfo, cooldownInfo, fastForward, deleteSkill, refreshSkills } = useSelectedSkill();
+    const { selectedSkill, levelInfo, nextLevelInfo, requirementsInfo, cooldownInfo, fastForward, deleteSkill, refreshSkills, toggleActivate } = useSelectedSkill();
     const { currentWIP, maxWIP, isWIPLimitReached } = useSkills();
     const [showValidation, setShowValidation] = useState(true);
 
@@ -54,6 +54,19 @@ export function SkillSidebar({ onLevelUpClick, onEditClick }: SkillSidebarProps)
                     </div>
                     <div className="flex gap-2">
                         <button
+                            onClick={() => toggleActivate(selectedSkill.id, !((selectedSkill as any).isActive))}
+                            className={`p-2 rounded-lg border transition-all flex items-center gap-2 ${(selectedSkill as any).isActive
+                                ? 'bg-blue-500/20 border-blue-500 text-blue-400 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
+                                : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-slate-300'
+                                }`}
+                            title={(selectedSkill as any).isActive ? "Quitar de enfoque" : "Fijar enfoque (máx 3)"}
+                        >
+                            <Zap size={16} fill={(selectedSkill as any).isActive ? 'currentColor' : 'none'} />
+                            <span className="text-[10px] font-bold uppercase tracking-tighter">
+                                {(selectedSkill as any).isActive ? 'En Enfoque' : 'Enfoque'}
+                            </span>
+                        </button>
+                        <button
                             onClick={onEditClick}
                             className="p-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
                             title="Editar skill"
@@ -83,8 +96,8 @@ export function SkillSidebar({ onLevelUpClick, onEditClick }: SkillSidebarProps)
                     <button
                         onClick={() => setShowValidation(true)}
                         className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${showValidation
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-white'
                             }`}
                     >
                         Sistema Anti-Autoengaño
@@ -92,8 +105,8 @@ export function SkillSidebar({ onLevelUpClick, onEditClick }: SkillSidebarProps)
                     <button
                         onClick={() => setShowValidation(false)}
                         className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${!showValidation
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-800 text-slate-400 hover:text-white'
                             }`}
                     >
                         Vista Clásica

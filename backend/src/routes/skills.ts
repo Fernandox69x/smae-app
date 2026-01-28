@@ -28,6 +28,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
             name: skill.name,
             category: skill.category,
             level: skill.level,
+            currentLevel: skill.currentLevel,
+            isActive: skill.isActive,
+            failCount: skill.failCount,
             lastPracticed: skill.lastPracticed ? Number(skill.lastPracticed) : null,
             wip: skill.wip,
             requirements: skill.requirements.map(r => r.requirementId),
@@ -241,4 +244,68 @@ router.put('/:id/level-up', async (req: AuthRequest, res: Response) => {
     }
 });
 
+/**
+ * PUT /api/skills/:id/activate
+ * Activar/desactivar una skill (límite 3 activas)
+ */
+router.put('/:id/activate', async (req: AuthRequest, res: Response) => {
+    try {
+        const id = req.params.id as string;
+        const { isActive } = req.body;
+
+        const skill = await prisma.skill.findFirst({
+            where: { id, userId: req.userId }
+        });
+
+        if (!skill) {
+            return res.status(404).json({ error: 'Skill no encontrada' });
+        }
+
+        // Si se quiere activar, verificar límite
+        if (isActive) {
+            const activeCount = await prisma.skill.count({
+                where: { userId: req.userId, isActive: true }
+            });
+
+            if (activeCount >= 3) {
+                return res.status(400).json({
+                    error: 'Límite de 3 skills activas alcanzado',
+                    message: 'Desactiva una skill primero para activar esta.'
+                });
+            }
+        }
+
+        const updated = await prisma.skill.update({
+            where: { id },
+            data: { isActive }
+        });
+
+        res.json({
+            ...updated,
+            lastPracticed: updated.lastPracticed ? Number(updated.lastPracticed) : null
+        });
+    } catch (error) {
+        console.error('Error toggling skill active:', error);
+        res.status(500).json({ error: 'Error al cambiar estado activo' });
+    }
+});
+
+/**
+ * GET /api/skills/active/count
+ * Obtener conteo de skills activas
+ */
+router.get('/active/count', async (req: AuthRequest, res: Response) => {
+    try {
+        const count = await prisma.skill.count({
+            where: { userId: req.userId, isActive: true }
+        });
+
+        res.json({ activeCount: count, maxActive: 3 });
+    } catch (error) {
+        console.error('Error counting active skills:', error);
+        res.status(500).json({ error: 'Error al contar skills activas' });
+    }
+});
+
 export default router;
+

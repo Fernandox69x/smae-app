@@ -92,10 +92,10 @@ export function ValidationPanel({ skillId, currentLevel, skillName, onLevelChang
                             <div
                                 key={level}
                                 className={`w-3 h-3 rounded-full ${level <= currentLevel
-                                        ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
-                                        : level === currentLevel + 1
-                                            ? 'bg-emerald-400/30 animate-pulse'
-                                            : 'bg-slate-600'
+                                    ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
+                                    : level === currentLevel + 1
+                                        ? 'bg-emerald-400/30 animate-pulse'
+                                        : 'bg-slate-600'
                                     }`}
                             />
                         ))}
@@ -131,8 +131,8 @@ export function ValidationPanel({ skillId, currentLevel, skillName, onLevelChang
                     }}
                     disabled={!canAttempt || isLoading}
                     className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${canAttempt && !isLoading
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
-                            : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                        ? 'bg-emerald-600 hover:bg-emerald-500 text-white'
+                        : 'bg-slate-700 text-slate-500 cursor-not-allowed'
                         }`}
                 >
                     <ArrowUp size={18} />
@@ -216,8 +216,8 @@ export function ValidationPanel({ skillId, currentLevel, skillName, onLevelChang
                             <div
                                 key={v.id}
                                 className={`flex items-center gap-2 text-xs p-2 rounded ${v.passed
-                                        ? 'bg-emerald-500/10 text-emerald-400'
-                                        : 'bg-red-500/10 text-red-400'
+                                    ? 'bg-emerald-500/10 text-emerald-400'
+                                    : 'bg-red-500/10 text-red-400'
                                     }`}
                             >
                                 {v.passed ? <CheckCircle size={12} /> : <XCircle size={12} />}
@@ -241,6 +241,39 @@ export function ValidationPanel({ skillId, currentLevel, skillName, onLevelChang
                     </p>
                 </div>
             )}
+
+            {/* Botón de Pánico (Honestidad Brutal) */}
+            {currentLevel > 0 && !showForm && (
+                <div className="pt-6 border-t border-slate-800">
+                    <button
+                        onClick={async () => {
+                            if (confirm('¿Honestidad Brutal? Esto reducirá tu nivel actual porque reconoces que no dominas el tema. No hay vuelta atrás.')) {
+                                // Buscar la última validación exitosa para invalidarla
+                                const lastPassed = validations.find(v => v.passed);
+                                if (lastPassed) {
+                                    const result = await triggerPanic(lastPassed.id);
+                                    if (result.success) {
+                                        onLevelChange?.();
+                                    }
+                                } else {
+                                    // Si no hay validaciones registradas (migración antigua), 
+                                    // el backend debería manejarlo o podemos mostrar error
+                                    alert('No se encontró una validación reciente para revertir. Contacta soporte.');
+                                }
+                            }
+                        }}
+                        disabled={isLoading}
+                        className="w-full py-2 bg-red-900/20 hover:bg-red-900/40 border border-red-900/50 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
+                    >
+                        <Zap size={12} fill="currentColor" />
+                        Botón de Pánico
+                    </button>
+                    <p className="text-[10px] text-slate-600 text-center mt-2 italic">
+                        Usa esto si sientes que te autoengañaste al validar.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }
+

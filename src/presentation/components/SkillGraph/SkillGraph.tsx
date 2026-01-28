@@ -98,8 +98,33 @@ export function SkillGraph() {
                             const parent = positionedSkills.find(s => s.id === reqId);
                             if (!parent) return null;
 
-                            const parentSatisfied = parent.level >= 4;
-                            const lineStroke = parentSatisfied ? '#10b981' : '#475569';
+                            // Usar currentLevel si existe, sino level
+                            const parentLevel = (parent as any).currentLevel ?? parent.level;
+                            const childLevel = (skill as any).currentLevel ?? skill.level;
+
+                            // Estados de la dependencia
+                            const parentCompleted = parentLevel >= 4; // Padre en maestría
+                            const parentInProgress = parentLevel >= 1 && parentLevel < 4;
+                            const childStarted = childLevel >= 1;
+
+                            // Colores según estado
+                            let lineStroke = '#475569'; // Gris por defecto (bloqueado)
+                            let strokeOpacity = 0.2;
+                            let strokeDash = '5,5';
+
+                            if (parentCompleted) {
+                                lineStroke = '#10b981'; // Verde - desbloqueado
+                                strokeOpacity = 0.6;
+                                strokeDash = '0';
+                            } else if (parentInProgress && childStarted) {
+                                lineStroke = '#3b82f6'; // Azul - ambos en progreso
+                                strokeOpacity = 0.4;
+                                strokeDash = '0';
+                            } else if (parentInProgress) {
+                                lineStroke = '#f59e0b'; // Naranja - padre en progreso
+                                strokeOpacity = 0.3;
+                                strokeDash = '3,3';
+                            }
 
                             return (
                                 <g key={`${reqId}-${skill.id}`}>
@@ -108,8 +133,8 @@ export function SkillGraph() {
                                         stroke={lineStroke}
                                         strokeWidth="2"
                                         fill="none"
-                                        strokeOpacity={parentSatisfied ? 0.4 : 0.2}
-                                        strokeDasharray={parentSatisfied ? '0' : '5,5'}
+                                        strokeOpacity={strokeOpacity}
+                                        strokeDasharray={strokeDash}
                                         className="transition-all duration-500"
                                     />
                                 </g>

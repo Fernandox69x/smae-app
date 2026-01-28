@@ -22,6 +22,7 @@ interface SkillContextType {
     getCooldownInfo: (id: string) => { isActive: boolean; hoursRemaining: number; expirationDate: Date | null };
     debugFastForward: (id: string, hours: number) => Promise<void>;
     refreshSkills: () => Promise<void>;
+    toggleActivate: (id: string, isActive: boolean) => Promise<{ success: boolean; error?: string }>;
 
     // CRUD
     createSkill: (data: Omit<SkillData, 'lastPracticed'>) => Promise<{ success: boolean; error?: string }>;
@@ -159,7 +160,17 @@ export function SkillProvider({ children }: SkillProviderProps) {
         }
     }, [refreshSkills, selectedSkillId]);
 
-    const currentWIP = useMemo(() => skills.filter(s => s.wip).length, [skills]);
+    const toggleActivate = useCallback(async (id: string, isActive: boolean) => {
+        try {
+            await apiSkillRepository.toggleActivate(id, isActive);
+            await refreshSkills();
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err instanceof Error ? err.message : 'Error al cambiar estado activo' };
+        }
+    }, [refreshSkills]);
+
+    const currentWIP = useMemo(() => skills.filter(s => (s as any).isActive || s.wip).length, [skills]);
     const isWIPLimitReached = useMemo(() => currentWIP >= MAX_WIP, [currentWIP]);
 
     const value: SkillContextType = {
@@ -178,6 +189,7 @@ export function SkillProvider({ children }: SkillProviderProps) {
         getCooldownInfo,
         debugFastForward,
         refreshSkills,
+        toggleActivate,
         createSkill,
         updateSkill,
         deleteSkill,

@@ -119,6 +119,24 @@ export class ApiSkillRepository implements ISkillRepository {
         return skill;
     }
 
+    async toggleActivate(id: string, isActive: boolean): Promise<Skill> {
+        const response = await fetch(`${API_BASE_URL}/skills/${id}/activate`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ isActive }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || error.message || 'Error al cambiar estado activo');
+        }
+
+        const skillData: SkillData = await response.json();
+        const skill = new Skill(skillData);
+        this.cache.set(skill.id, skill);
+        return skill;
+    }
+
     // Métodos síncronos para compatibilidad
     save(skill: Skill): void {
         this.cache.set(skill.id, skill);
