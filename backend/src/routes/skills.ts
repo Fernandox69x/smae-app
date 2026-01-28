@@ -48,9 +48,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
  */
 router.get('/:id', async (req: AuthRequest, res: Response) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id as string;
         const skill = await prisma.skill.findFirst({
-            where: { id, userId: req.userId },
+            where: { id, userId: req.userId as string },
             include: {
                 requirements: {
                     select: { requirementId: true }
@@ -118,7 +118,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
  */
 router.put('/:id', async (req: AuthRequest, res: Response) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id as string;
         const { name, category, level, lastPracticed, wip, requirements, x, y } = req.body;
 
         // Verificar que la skill pertenece al usuario
@@ -177,7 +177,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
  */
 router.delete('/:id', async (req: AuthRequest, res: Response) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id as string;
 
         // Verificar que la skill pertenece al usuario
         const existing = await prisma.skill.findFirst({
@@ -205,7 +205,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
  */
 router.put('/:id/level-up', async (req: AuthRequest, res: Response) => {
     try {
-        const { id } = req.params;
+        const id = req.params.id as string;
 
         const skill = await prisma.skill.findFirst({
             where: { id, userId: req.userId }
