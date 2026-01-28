@@ -3,6 +3,7 @@ import cors from 'cors';
 import { PrismaClient } from '@prisma/client';
 import skillRoutes from './routes/skills';
 import authRoutes from './routes/auth';
+import validationRoutes from './routes/validations';
 
 const app = express();
 const prisma = new PrismaClient();
@@ -36,6 +37,7 @@ app.get('/api/health', (req, res) => {
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/skills', skillRoutes);
+app.use('/api/validations', validationRoutes);
 
 // Error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {

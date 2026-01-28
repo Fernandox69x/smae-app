@@ -19,11 +19,10 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  // Relación con skills
-  skills       Skill[]
-
-  // Relación con tokens de reset
+  // Relaciones
+  skills              Skill[]
   passwordResetTokens PasswordResetToken[]
+  notifications       Notification[]
 
   @@map("users")
 }
@@ -33,11 +32,19 @@ model Skill {
   id            String   @id
   name          String   @db.VarChar(100)
   category      String   @db.VarChar(50)
+  
+  // Sistema de niveles anti-autoengaño (1-4)
+  currentLevel  Int      @default(1) @map("current_level")
+  isActive      Boolean  @default(false) @map("is_active") // Max 3 activas
+  failCount     Int      @default(0) @map("fail_count") // Para nodo refuerzo
+  
+  // Campos legacy (mantener compatibilidad)
   level         Int      @default(0)
   lastPracticed BigInt?  @map("last_practiced")
   wip           Boolean  @default(false)
   x             Float
   y             Float
+  
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
@@ -48,6 +55,9 @@ model Skill {
   // Relaciones de dependencias
   requirements  SkillRequirement[] @relation("SkillRequirements")
   dependents    SkillRequirement[] @relation("SkillDependents")
+  
+  // Validaciones del sistema anti-autoengaño
+  validations   Validation[]
 
   @@map("skills")
 }
@@ -76,3 +86,53 @@ model PasswordResetToken {
 
   @@map("password_reset_tokens")
 }
+
+/// Validación de nivel (sistema anti-autoengaño)
+model Validation {
+  id          String    @id @default(uuid())
+  skillId     String    @map("skill_id")
+  skill       Skill     @relation(fields: [skillId], references: [id], onDelete: Cascade)
+  
+  // Nivel intentado (1=Mapa, 2=Sombra, 3=PruebaFría, 4=Consolidación)
+  level       Int
+  
+  // Tipo de evidencia
+  evidenceType String?  @map("evidence_type") @db.VarChar(50) // explanation, practice, cold_test, consolidation
+  evidence    String?   @db.Text // Explicación, link, etc.
+  aiAnalysis  String?   @map("ai_analysis") @db.Text // Respuesta de IA si aplica
+  
+  // Resultado
+  passed      Boolean   @default(false)
+  attemptedAt DateTime  @default(now()) @map("attempted_at")
+  passedAt    DateTime? @map("passed_at")
+  
+  // Cooldown para L4 (48h)
+  cooldownEnd DateTime? @map("cooldown_end")
+
+  @@map("validations")
+}
+
+/// Notificaciones del sistema
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Tipo: cooldown, degradation, focus, reminder
+  type      String   @db.VarChar(50)
+  title     String   @db.VarChar(200)
+  message   String   @db.Text
+  
+  // Referencia opcional a skill
+  skillId   String?  @map("skill_id")
+  
+  // Programación
+  sendAt    DateTime @map("send_at")
+  sent      Boolean  @default(false)
+  readAt    DateTime? @map("read_at")
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("notifications")
+}
+
