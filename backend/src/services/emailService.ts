@@ -1,0 +1,71 @@
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+
+/**
+ * Envía un email de recuperación de contraseña
+ */
+export async function sendPasswordResetEmail(
+    to: string,
+    token: string,
+    userName?: string
+): Promise<{ success: boolean; error?: string }> {
+    const resetUrl = `${FRONTEND_URL}/reset-password?token=${token}`;
+
+    try {
+        const { error } = await resend.emails.send({
+            from: 'S.M.A.E. <onboarding@resend.dev>', // Cambiar por tu dominio verificado
+            to: [to],
+            subject: 'Recupera tu contraseña - S.M.A.E.',
+            html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f5; margin: 0; padding: 20px; }
+            .container { max-width: 480px; margin: 0 auto; background: white; border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .logo { font-size: 24px; font-weight: bold; color: #10b981; text-align: center; margin-bottom: 24px; }
+            h1 { color: #18181b; font-size: 20px; margin-bottom: 16px; }
+            p { color: #52525b; line-height: 1.6; }
+            .btn { display: inline-block; background: #10b981; color: white !important; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin: 24px 0; }
+            .btn:hover { background: #059669; }
+            .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid #e4e4e7; font-size: 12px; color: #a1a1aa; text-align: center; }
+            .warning { background: #fef3c7; border-radius: 8px; padding: 12px; margin-top: 16px; font-size: 14px; color: #92400e; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="logo">🎯 S.M.A.E.</div>
+            <h1>Hola${userName ? ` ${userName}` : ''},</h1>
+            <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta.</p>
+            <p>Haz clic en el siguiente botón para crear una nueva contraseña:</p>
+            <center>
+              <a href="${resetUrl}" class="btn">Restablecer Contraseña</a>
+            </center>
+            <div class="warning">
+              ⏰ Este enlace expirará en <strong>1 hora</strong>.
+            </div>
+            <p style="margin-top: 24px;">Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseña seguirá siendo la misma.</p>
+            <div class="footer">
+              © ${new Date().getFullYear()} S.M.A.E. - Sistema de Maestría y Aprendizaje Efectivo
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+        });
+
+        if (error) {
+            console.error('Error enviando email:', error);
+            return { success: false, error: error.message };
+        }
+
+        return { success: true };
+    } catch (err) {
+        console.error('Error en servicio de email:', err);
+        return { success: false, error: 'Error al enviar email' };
+    }
+}
