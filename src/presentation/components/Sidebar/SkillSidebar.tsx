@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BookOpen, Crown, Lock, Edit2, Trash2, Zap } from 'lucide-react';
+import { BookOpen, Crown, Lock, Edit2, Trash2, Zap, X } from 'lucide-react';
 import { useSelectedSkill, useSkills } from '../../hooks/useSkills';
 import { StatusCard } from './StatusCard';
 import { ValidationPanel } from './ValidationPanel';
@@ -14,7 +14,7 @@ interface SkillSidebarProps {
  * Sidebar con detalles de la skill seleccionada
  */
 export function SkillSidebar({ onLevelUpClick, onEditClick, onClose }: SkillSidebarProps) {
-    const { selectedSkill, levelInfo, nextLevelInfo, requirementsInfo, cooldownInfo, fastForward, deleteSkill, refreshSkills, toggleActivate } = useSelectedSkill();
+    const { selectedSkill, nextLevelInfo, requirementsInfo, cooldownInfo, fastForward, deleteSkill, refreshSkills, toggleActivate } = useSelectedSkill();
     const { currentWIP, maxWIP, isWIPLimitReached } = useSkills();
     const [showValidation, setShowValidation] = useState(true);
 
@@ -196,5 +196,4 @@ export function SkillSidebar({ onLevelUpClick, onEditClick, onClose }: SkillSide
     );
 }
 
-import { X } from 'lucide-react';
 

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@presentation/context/AuthContext';
 import { useSkillContext, SkillProvider } from '@presentation/context/SkillContext';
 import { Header } from '@presentation/components/Header';
@@ -14,6 +15,7 @@ import { Loader2, LogOut, User } from 'lucide-react';
 function DashboardContent() {
     const { isLoading, selectedSkillId, skills } = useSkillContext();
     const { user, logout } = useAuth();
+    const navigate = useNavigate();
     const [showEvidenceModal, setShowEvidenceModal] = useState(false);
     const [showSkillFormModal, setShowSkillFormModal] = useState(false);
     const [editingSkill, setEditingSkill] = useState<{
@@ -82,7 +84,7 @@ function DashboardContent() {
                 <div className="flex flex-col">
                     <h1
                         className="text-lg sm:text-xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent cursor-pointer"
-                        onClick={() => window.location.href = '/'}
+                        onClick={() => navigate('/')}
                     >
                         S.M.A.E.
                     </h1>

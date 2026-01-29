@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@presentation/context/AuthContext';
 import { LandingPage } from '@presentation/pages/LandingPage';
 import { DashboardPage } from '@presentation/pages/DashboardPage';
@@ -12,6 +12,7 @@ import { Loader2 } from 'lucide-react';
  */
 function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
+    const navigate = useNavigate();
 
     if (isLoading) {
         return (
@@ -32,7 +33,7 @@ function AppRoutes() {
                 element={
                     isAuthenticated
                         ? <Navigate to="/dashboard" replace />
-                        : <AuthPage onSuccess={() => window.location.href = '/dashboard'} />
+                        : <AuthPage onSuccess={() => navigate('/dashboard')} />
                 }
             />
             <Route path="/forgot-password" element={<ForgotPasswordPage />} />
