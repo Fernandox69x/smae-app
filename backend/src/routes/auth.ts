@@ -51,7 +51,7 @@ router.post('/register', async (req: Request, res: Response) => {
         });
 
         // Generar token
-        const token = generateToken(user.id);
+        const token = generateToken(user.id, user.email);
 
         res.status(201).json({
             user,
@@ -92,7 +92,7 @@ router.post('/login', async (req: Request, res: Response) => {
         }
 
         // Generar token
-        const token = generateToken(user.id);
+        const token = generateToken(user.id, user.email);
 
         res.json({
             user: {

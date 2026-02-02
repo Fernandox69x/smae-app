@@ -2,19 +2,25 @@ import { useState, useEffect } from 'react';
 import { useValidations } from '../../hooks/useValidations';
 import {
     CheckCircle,
-    XCircle,
-    AlertTriangle,
     Clock,
     ArrowUp,
     Loader2,
+    Zap,
+    LucideIcon,
     Eye,
     Pencil,
-    Zap,
     Award
 } from 'lucide-react';
 
-const LEVEL_INFO = [
-    { name: 'L0', label: 'Sin empezar', description: 'Aún no has comenzado' },
+interface LevelInfoItem {
+    name: string;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+}
+
+const LEVEL_INFO: LevelInfoItem[] = [
+    { name: 'L0', label: 'Sin empezar', description: 'Aún no has comenzado', icon: Eye },
     { name: 'L1', label: 'El Mapa', description: 'Explica el concepto en una frase', icon: Eye },
     { name: 'L2', label: 'La Sombra', description: 'Completa con guía/tutorial', icon: Pencil },
     { name: 'L3', label: 'Prueba Fría', description: 'Hazlo sin ayuda externa', icon: Zap },
@@ -29,7 +35,7 @@ interface ValidationPanelProps {
 }
 
 /**
- * Panel de validación para sistema anti-autoengaño
+ * Panel de validación unificado con trazabilidad (Timeline)
  */
 export function ValidationPanel({ skillId, currentLevel, onLevelChange }: ValidationPanelProps) {
     const {
@@ -54,7 +60,7 @@ export function ValidationPanel({ skillId, currentLevel, onLevelChange }: Valida
     useEffect(() => {
         fetchValidations();
         checkCooldown();
-    }, [fetchValidations, checkCooldown]);
+    }, [skillId]);
 
     const handleAIAnalysis = async () => {
         if (!evidence.trim()) return;
@@ -69,10 +75,6 @@ export function ValidationPanel({ skillId, currentLevel, onLevelChange }: Valida
         }
     };
 
-    // Calcular siguiente nivel disponible
-    const nextLevel = Math.min(currentLevel + 1, 4);
-    const canAttempt = nextLevel <= 4 && (nextLevel < 4 || cooldownStatus?.canAttemptL4);
-
     const handleSubmit = async (passed: boolean) => {
         const result = await submitValidation(
             attemptLevel,
@@ -84,7 +86,9 @@ export function ValidationPanel({ skillId, currentLevel, onLevelChange }: Valida
         if (result?.success) {
             setShowForm(false);
             setEvidence('');
+            setAiAnalysis(null);
             onLevelChange?.();
+            fetchValidations();
         }
     };
 
@@ -95,270 +99,188 @@ export function ValidationPanel({ skillId, currentLevel, onLevelChange }: Valida
     };
 
     return (
-        <div className="space-y-4">
-            {/* Estado Actual */}
-            <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                <h3 className="text-sm font-semibold text-slate-300 mb-3">
-                    Sistema Anti-Autoengaño
-                </h3>
+        <div className="flex flex-col h-full overflow-hidden">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
+                <Clock size={14} />
+                Trazabilidad de Maestría
+            </h3>
 
-                {/* Indicador de nivel actual */}
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="flex gap-1">
-                        {[1, 2, 3, 4].map(level => (
-                            <div
-                                key={level}
-                                className={`w-3 h-3 rounded-full ${level <= currentLevel
-                                    ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]'
-                                    : level === currentLevel + 1
-                                        ? 'bg-emerald-400/30 animate-pulse'
-                                        : 'bg-slate-600'
-                                    }`}
-                            />
-                        ))}
-                    </div>
-                    <span className="text-white font-bold">
-                        {LEVEL_INFO[currentLevel]?.label || 'Sin empezar'}
-                    </span>
-                </div>
+            {/* Trazabilidad Vertical (Timeline) */}
+            <div className="relative pl-8 space-y-6 before:absolute before:left-3 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-800 flex-1 overflow-y-auto pr-2 custom-scrollbar">
+                {LEVEL_INFO.map((level, index) => {
+                    if (index === 0) return null; // Saltar L0 en la timeline visual
 
-                {/* Siguiente nivel */}
-                {currentLevel < 4 && (
-                    <div className="text-sm text-slate-400 mb-3">
-                        <span className="text-emerald-400">Siguiente: </span>
-                        {LEVEL_INFO[nextLevel]?.label} - {LEVEL_INFO[nextLevel]?.description}
-                    </div>
-                )}
+                    const isCompleted = index <= currentLevel;
+                    const isNext = index === currentLevel + 1;
+                    const Icon = level.icon;
 
-                {/* Cooldown para L4 */}
-                {nextLevel === 4 && !cooldownStatus?.canAttemptL4 && cooldownStatus?.timeRemaining && (
-                    <div className="flex items-center gap-2 text-orange-400 text-sm bg-orange-500/10 rounded-lg p-3 mb-3">
-                        <Clock size={16} />
-                        Cooldown activo: {formatTimeRemaining(cooldownStatus.timeRemaining)}
-                    </div>
-                )}
+                    // Buscar validación para este nivel
+                    const levelValidation = validations.find(v => v.level === index && v.passed);
+
+                    return (
+                        <div key={index} className="relative">
+                            {/* Punto de la Timeline */}
+                            <div className={`absolute -left-8 w-6 h-6 rounded-full flex items-center justify-center z-10 
+                                ${isCompleted ? 'bg-emerald-500 text-slate-900 shadow-[0_0_10px_rgba(16,185,129,0.4)]' :
+                                    isNext ? 'bg-slate-700 border-2 border-emerald-500 text-emerald-400' :
+                                        'bg-slate-800 border-2 border-slate-700 text-slate-600'}`}>
+                                {isCompleted ? <CheckCircle size={14} /> : <Icon size={12} />}
+                            </div>
+
+                            <div className={`p-4 rounded-xl border transition-all ${isCompleted ? 'bg-emerald-500/5 border-emerald-500/20' :
+                                    isNext ? 'bg-slate-800 border-slate-700 shadow-lg' :
+                                        'bg-slate-900/50 border-slate-800 opacity-50'
+                                }`}>
+                                <div className="flex justify-between items-start mb-1">
+                                    <h4 className={`text-sm font-bold ${isCompleted ? 'text-emerald-400' : 'text-slate-200'}`}>
+                                        {level.label}
+                                    </h4>
+                                    {isCompleted && levelValidation && (
+                                        <span className="text-[10px] text-slate-500">
+                                            {new Date(levelValidation.attemptedAt).toLocaleDateString()}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-xs text-slate-400 leading-relaxed">
+                                    {level.description}
+                                </p>
+
+                                {/* Botón de Acción según estado */}
+                                {isNext && !showForm && (
+                                    <div className="mt-4 space-y-2">
+                                        {index === 4 && cooldownStatus?.timeRemaining && !cooldownStatus.canAttemptL4 ? (
+                                            <div className="flex items-center gap-2 text-orange-400 text-[10px] bg-orange-500/10 rounded-lg p-2">
+                                                <Clock size={12} />
+                                                Esperar: {formatTimeRemaining(cooldownStatus.timeRemaining)}
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => {
+                                                    setAttemptLevel(index);
+                                                    setShowForm(true);
+                                                }}
+                                                className="w-full py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20"
+                                            >
+                                                Validar Ahora
+                                                <ArrowUp size={14} />
+                                            </button>
+                                        )}
+
+                                        {currentLevel === 0 && index === 1 && (
+                                            <button
+                                                onClick={async () => {
+                                                    setIsAnalyzing(true);
+                                                    const suggestions = await getAISuggestions();
+                                                    if (suggestions) {
+                                                        setAiAnalysis({
+                                                            passed: true,
+                                                            score: 10,
+                                                            feedback: `Plan generado (${suggestions.estimatedTime}):`,
+                                                            suggestions: suggestions.steps.map((s: any) => `${s.action}: ${s.details}`)
+                                                        });
+                                                        setShowForm(true);
+                                                        setAttemptLevel(1);
+                                                    }
+                                                    setIsAnalyzing(false);
+                                                }}
+                                                className="w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+                                            >
+                                                {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} fill="currentColor" />}
+                                                Generar Plan IA
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
-            {/* Botón para intentar validación */}
-            {!showForm && currentLevel < 4 && (
-                <div className="space-y-3">
-                    <button
-                        onClick={() => {
-                            setAttemptLevel(nextLevel);
-                            setShowForm(true);
-                        }}
-                        disabled={!canAttempt || isLoading}
-                        className={`w-full py-3 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${canAttempt && !isLoading
-                            ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg'
-                            : 'bg-slate-700 text-slate-500 cursor-not-allowed'
-                            }`}
-                    >
-                        <ArrowUp size={18} />
-                        Intentar {LEVEL_INFO[nextLevel]?.label}
-                    </button>
-
-                    {currentLevel === 0 && (
-                        <button
-                            onClick={async () => {
-                                setIsAnalyzing(true);
-                                const suggestions = await getAISuggestions();
-                                if (suggestions) {
-                                    setAiAnalysis({
-                                        passed: true,
-                                        score: 10,
-                                        feedback: `Plan de estudio generado (${suggestions.estimatedTime}):`,
-                                        suggestions: suggestions.steps.map((s: any) => `${s.action}: ${s.details}`)
-                                    });
-                                }
-                                setIsAnalyzing(false);
-                            }}
-                            disabled={isAnalyzing || isLoading}
-                            className="w-full py-2 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-all"
-                        >
-                            {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} fill="currentColor" />}
-                            Generar Plan de Estudio (IA)
-                        </button>
-                    )}
-                </div>
-            )}
-
-            {/* Formulario de validación */}
+            {/* Formulario Modal-like den tro del sidebar */}
             {showForm && (
-                <div className="bg-slate-800 rounded-lg p-4 border border-emerald-500/30">
-                    <h4 className="text-emerald-400 font-semibold mb-3">
-                        Validación: {LEVEL_INFO[attemptLevel]?.label}
-                    </h4>
+                <div className="fixed inset-0 lg:absolute lg:inset-x-0 bottom-0 top-0 bg-slate-950/95 z-40 p-6 flex flex-col justify-center animate-in fade-in slide-in-from-bottom-5">
+                    <div className="bg-slate-900 rounded-2xl border border-emerald-500/30 p-5 shadow-2xl">
+                        <h4 className="text-emerald-400 font-bold mb-1">
+                            Validación de Maestría
+                        </h4>
+                        <p className="text-xs text-slate-400 mb-4">
+                            {LEVEL_INFO[attemptLevel]?.label}: {LEVEL_INFO[attemptLevel]?.description}
+                        </p>
 
-                    <p className="text-slate-400 text-sm mb-4">
-                        {LEVEL_INFO[attemptLevel]?.description}
-                    </p>
+                        <div className="space-y-3">
+                            <textarea
+                                value={evidence}
+                                onChange={(e) => setEvidence(e.target.value)}
+                                placeholder="Describe tu evidencia aquí..."
+                                className="w-full h-32 bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:border-emerald-500 focus:outline-none"
+                            />
 
-                    <div className="flex justify-between items-center mb-1">
-                        <label className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">
-                            Tu Evidencia
-                        </label>
-                        {!aiAnalysis && evidence.length > 5 && evidence.length <= 20 && (
-                            <span className="text-[10px] text-indigo-400 animate-pulse">
-                                Escribe {21 - evidence.length} chars más para IA
-                            </span>
-                        )}
-                    </div>
-
-                    <div className="relative">
-                        <textarea
-                            value={evidence}
-                            onChange={(e) => setEvidence(e.target.value)}
-                            placeholder={
-                                attemptLevel === 1
-                                    ? "Explica el concepto en una sola frase simple..."
-                                    : attemptLevel === 2
-                                        ? "¿Qué guía/tutorial seguiste? ¿Cómo te fue?"
-                                        : attemptLevel === 3
-                                            ? "Describe cómo lo lograste sin ayuda..."
-                                            : "Explica el PORQUÉ de cada paso..."
-                            }
-                            className={`w-full h-32 bg-slate-900 border ${aiAnalysis ? 'border-indigo-500/50' : 'border-slate-700'} rounded-lg p-3 text-white text-sm resize-none focus:border-emerald-500 focus:outline-none transition-all`}
-                        />
-
-                        {evidence.length > 20 && !aiAnalysis && (
-                            <button
-                                onClick={handleAIAnalysis}
-                                disabled={isAnalyzing}
-                                className="absolute bottom-3 right-3 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg shadow-indigo-900/40 transition-all group flex items-center gap-2"
-                                title="Consultar Asistente de IA SMAE"
-                            >
-                                {isAnalyzing ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} className="group-hover:scale-110 transition-transform" />}
-                                <span className="text-[10px] font-bold uppercase">Analizar con IA</span>
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Feedback de la IA */}
-                    {aiAnalysis && (
-                        <div className={`mt-3 p-3 rounded-lg border text-xs animate-in fade-in slide-in-from-top-1 duration-300 ${aiAnalysis.passed ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-300' : 'bg-orange-500/10 border-orange-500/30 text-orange-300'
-                            }`}>
-                            <div className="flex justify-between items-start mb-2">
-                                <span className="font-bold flex items-center gap-1">
-                                    <Zap size={12} fill="currentColor" /> Análisis del Asistente IA: {aiAnalysis.score}/10
-                                </span>
-                                <button onClick={() => setAiAnalysis(null)} className="text-slate-500 hover:text-white">✕</button>
-                            </div>
-                            <p className="mb-2 leading-relaxed">{aiAnalysis.feedback}</p>
-                            {aiAnalysis.suggestions && aiAnalysis.suggestions.length > 0 && (
-                                <ul className="space-y-1 list-disc pl-4 opacity-80">
-                                    {aiAnalysis.suggestions.map((s: string, i: number) => (
-                                        <li key={i}>{s}</li>
-                                    ))}
-                                </ul>
+                            {evidence.length > 20 && !aiAnalysis && (
+                                <button
+                                    onClick={handleAIAnalysis}
+                                    disabled={isAnalyzing}
+                                    className="w-full py-2 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-lg border border-indigo-500/30 flex items-center justify-center gap-2"
+                                >
+                                    {isAnalyzing ? <Loader2 size={12} className="animate-spin" /> : <Zap size={12} fill="currentColor" />}
+                                    Analizar Honestidad con IA
+                                </button>
                             )}
-                        </div>
-                    )}
 
-                    <div className="flex gap-2 mt-4">
-                        <button
-                            onClick={() => handleSubmit(true)}
-                            disabled={isLoading || !evidence.trim()}
-                            className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-500 text-white rounded-lg font-semibold flex items-center justify-center gap-2"
-                        >
-                            {isLoading ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle size={16} />}
-                            Pasé
-                        </button>
-                        <button
-                            onClick={() => handleSubmit(false)}
-                            disabled={isLoading}
-                            className="flex-1 py-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/50 text-red-400 rounded-lg font-semibold flex items-center justify-center gap-2"
-                        >
-                            <XCircle size={16} />
-                            Fallé
-                        </button>
-                    </div>
+                            {aiAnalysis && (
+                                <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-lg text-[11px] text-indigo-300">
+                                    <p className="font-bold mb-1 italic">Veredicto IA: {aiAnalysis.score}/10</p>
+                                    <p className="leading-tight opacity-80">{aiAnalysis.feedback}</p>
+                                </div>
+                            )}
 
-                    <button
-                        onClick={() => {
-                            setShowForm(false);
-                            setEvidence('');
-                        }}
-                        className="w-full mt-2 py-2 text-slate-500 hover:text-slate-300 text-sm"
-                    >
-                        Cancelar
-                    </button>
-                </div>
-            )}
-
-            {/* Error */}
-            {error && (
-                <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 rounded-lg p-3">
-                    <AlertTriangle size={16} />
-                    {error}
-                </div>
-            )}
-
-            {/* Historial de validaciones */}
-            {validations.length > 0 && (
-                <div className="mt-4">
-                    <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
-                        Historial
-                    </h4>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {validations.slice(0, 5).map(v => (
-                            <div
-                                key={v.id}
-                                className={`flex items-center gap-2 text-xs p-2 rounded ${v.passed
-                                    ? 'bg-emerald-500/10 text-emerald-400'
-                                    : 'bg-red-500/10 text-red-400'
-                                    }`}
-                            >
-                                {v.passed ? <CheckCircle size={12} /> : <XCircle size={12} />}
-                                <span>L{v.level}</span>
-                                <span className="text-slate-500">
-                                    {new Date(v.attemptedAt).toLocaleDateString()}
-                                </span>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleSubmit(true)}
+                                    disabled={isLoading || !evidence.trim()}
+                                    className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold flex items-center justify-center gap-2"
+                                >
+                                    Pasé
+                                </button>
+                                <button
+                                    onClick={() => handleSubmit(false)}
+                                    className="flex-1 py-3 bg-red-600/20 border border-red-500/40 text-red-500 rounded-xl font-bold"
+                                >
+                                    Fallé
+                                </button>
                             </div>
-                        ))}
+
+                            <button
+                                onClick={() => { setShowForm(false); setAiAnalysis(null); }}
+                                className="w-full py-2 text-slate-500 text-xs hover:text-slate-300"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Maestría alcanzada */}
-            {currentLevel >= 4 && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 text-center">
-                    <Award className="mx-auto text-amber-400 mb-2" size={32} />
-                    <p className="text-amber-400 font-bold">¡Maestría Alcanzada!</p>
-                    <p className="text-slate-400 text-sm mt-1">
-                        Has consolidado este conocimiento
-                    </p>
-                </div>
-            )}
-
-            {/* Botón de Pánico (Honestidad Brutal) */}
-            {currentLevel > 0 && !showForm && (
-                <div className="pt-6 border-t border-slate-800">
+            {/* Panic Button */}
+            <div className="mt-8 pt-6 border-t border-slate-800/50">
+                {currentLevel > 0 && !showForm && (
                     <button
                         onClick={async () => {
-                            if (confirm('¿Honestidad Brutal? Esto reducirá tu nivel actual porque reconoces que no dominas el tema. No hay vuelta atrás.')) {
-                                // Buscar la última validación exitosa para invalidarla
+                            if (confirm('¿Honestidad Brutal? Retrocederás un nivel.')) {
                                 const lastPassed = validations.find(v => v.passed);
                                 if (lastPassed) {
                                     const result = await triggerPanic(lastPassed.id);
-                                    if (result.success) {
-                                        onLevelChange?.();
-                                    }
-                                } else {
-                                    alert('No se encontró una validación reciente para revertir. Contacta soporte.');
+                                    if (result.success) onLevelChange?.();
                                 }
                             }
                         }}
-                        disabled={isLoading}
-                        className="w-full py-2 bg-red-900/20 hover:bg-red-900/40 border border-red-900/50 text-red-500 rounded-lg text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 transition-all"
+                        className="w-full py-2 text-red-500/50 hover:text-red-500 text-[10px] font-bold uppercase tracking-widest border border-red-500/20 hover:border-red-500/40 rounded-lg transition-all"
                     >
-                        <Zap size={12} fill="currentColor" />
                         Botón de Pánico
                     </button>
-                    <p className="text-[10px] text-slate-600 text-center mt-2 italic">
-                        Usa esto si sientes que te autoengañaste al validar.
-                    </p>
-                </div>
-            )}
+                )}
+                {error && <p className="text-red-400 text-[10px] mt-2 text-center">{error}</p>}
+            </div>
         </div>
     );
 }

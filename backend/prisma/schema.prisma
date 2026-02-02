@@ -19,10 +19,20 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  // Relaciones
+  // Relaciones SMAE
   skills              Skill[]
   passwordResetTokens PasswordResetToken[]
   notifications       Notification[]
+
+  // Relaciones FlowControl
+  financialAccounts      FinancialAccount[]
+  transactions           Transaction[]
+  transactionCategories  TransactionCategory[]
+  receivables            Receivable[]
+  flowNotifications      FlowNotification[]
+  flowControlSettings    FlowControlSettings?
+  loans                  Loan[]
+  recurringTransactions  RecurringTransaction[]
 
   @@map("users")
 }
@@ -140,5 +150,311 @@ model Notification {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("notifications")
+}
+
+/// Portfolio configuration (key-value store)
+model PortfolioConfig {
+  id        String   @id @default(uuid())
+  key       String   @unique @db.VarChar(100) // "hero", "about", "profile", etc.
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("portfolio_config")
+}
+
+/// Social links for portfolio
+model SocialLink {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(50) // "GitHub", "LinkedIn", etc.
+  url       String   @db.VarChar(500)
+  icon      String   @db.VarChar(30) // icon identifier
+  order     Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("social_links")
+}
+
+/// Simple page visit tracking
+model PageVisit {
+  id        String   @id @default(uuid())
+  path      String   @db.VarChar(200) // "/", "/projects", "/contact"
+  userAgent String?  @map("user_agent") @db.VarChar(500)
+  referrer  String?  @db.VarChar(500)
+  ip        String?  @db.VarChar(45)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("page_visits")
+}
+
+/// Contact form submissions
+model ContactSubmission {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(100)
+  email     String   @db.VarChar(255)
+  subject   String   @db.VarChar(200)
+  message   String   @db.Text
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("contact_submissions")
+}
+
+/// Portfolio projects
+model Project {
+  id          String   @id @default(uuid())
+  name        String   @db.VarChar(100)
+  subtitle    String?  @db.VarChar(150)
+  description String   @db.Text
+  imageUrl    String?  @map("image_url") @db.VarChar(500)
+  projectUrl  String?  @map("project_url") @db.VarChar(500) // Live demo URL
+  repoUrl     String?  @map("repo_url") @db.VarChar(500)    // GitHub/GitLab URL
+  technologies String[] // Array of tech names
+  status      String   @default("development") @db.VarChar(20) // "live", "development", "archived"
+  featured    Boolean  @default(false)
+  order       Int      @default(0)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("projects")
+}
+
+// ========================================
+// FLOWCONTROL - Sistema de Gestión Financiera
+// ========================================
+
+/// Cuentas financieras (efectivo, tarjetas, bancos)
+model FinancialAccount {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String   @db.VarChar(100)    // "Efectivo", "Tarjeta Visa", "BAC USD"
+  bank        String?  @db.VarChar(50)     // "BAC", "Banpro", "Lafise", null for cash
+  type        String   @db.VarChar(20)     // "cash", "debit", "credit"
+  currency    String   @default("NIO") @db.VarChar(3)  // "NIO", "USD"
+  balance     Decimal  @default(0) @db.Decimal(12,2)
+  creditLimit Decimal? @map("credit_limit") @db.Decimal(12,2)
+  usedCredit  Decimal  @default(0) @map("used_credit") @db.Decimal(12,2)
+  color       String   @default("#6366f1") @db.VarChar(7)
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  user               User @relation(fields: [userId], references: [id])
+  transactions       Transaction[]
+  transfersFrom      AccountTransfer[] @relation("TransferFrom")
+  transfersTo        AccountTransfer[] @relation("TransferTo")
+  recurringTransactions RecurringTransaction[]
+  
+  @@map("financial_accounts")
+}
+
+/// Transacciones (ingresos/egresos)
+model Transaction {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  accountId   String   @map("account_id")
+  categoryId  String?  @map("category_id")
+  
+  // Monto en la moneda original
+  amount         Decimal  @db.Decimal(12,2)   // Positivo = ingreso, Negativo = gasto
+  currency       String   @default("NIO") @db.VarChar(3)  // Moneda de la transacción
+  
+  // Tipo de cambio al momento de aplicar (solo si currency != account.currency)
+  exchangeRate   Decimal? @map("exchange_rate") @db.Decimal(10,4) // Ej: 36.50
+  amountConverted Decimal? @map("amount_converted") @db.Decimal(12,2) // Monto convertido
+  
+  description String   @db.VarChar(255)
+  dueDate     DateTime @map("due_date")     // Fecha de impacto/cobro/pago
+  status      String   @default("pending") @db.VarChar(20) // "pending", "applied", "cancelled"
+  isRecurring Boolean  @default(false) @map("is_recurring")
+  recurrence  String?  @db.VarChar(20)      // "weekly", "biweekly", "monthly"
+  notes       String?  @db.Text
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  appliedAt   DateTime? @map("applied_at")
+  
+  user     User @relation(fields: [userId], references: [id])
+  account  FinancialAccount @relation(fields: [accountId], references: [id])
+  category TransactionCategory? @relation(fields: [categoryId], references: [id])
+  loanPayments LoanPayment[]
+  
+  recurringTransactionId String? @map("recurring_transaction_id")
+  recurringTransaction   RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id])
+  
+  @@map("flow_transactions")
+}
+
+/// Transferencias entre cuentas (incluyendo conversión de moneda)
+model AccountTransfer {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  fromAccountId   String   @map("from_account_id")
+  toAccountId     String   @map("to_account_id")
+  
+  amountFrom      Decimal  @map("amount_from") @db.Decimal(12,2)  // Monto que sale
+  amountTo        Decimal  @map("amount_to") @db.Decimal(12,2)    // Monto que entra (puede diferir por TC)
+  exchangeRate    Decimal? @map("exchange_rate") @db.Decimal(10,4)
+  
+  description     String?  @db.VarChar(255)
+  createdAt       DateTime @default(now()) @map("created_at")
+  
+  fromAccount     FinancialAccount @relation("TransferFrom", fields: [fromAccountId], references: [id])
+  toAccount       FinancialAccount @relation("TransferTo", fields: [toAccountId], references: [id])
+  
+  @@map("account_transfers")
+}
+
+/// Categorías de transacciones
+model TransactionCategory {
+  id       String  @id @default(uuid())
+  userId   String  @map("user_id")
+  name     String  @db.VarChar(50)     // "Servicios", "Deudas", "Despensa"
+  type     String  @db.VarChar(20)     // "income", "expense", "both"
+  color    String  @default("#6366f1") @db.VarChar(7)
+  icon     String? @db.VarChar(50)
+  isFixed  Boolean @default(false) @map("is_fixed") // Gasto fijo vs variable
+  
+  user         User @relation(fields: [userId], references: [id])
+  transactions Transaction[]
+  recurringTransactions RecurringTransaction[]
+  
+  @@map("transaction_categories")
+}
+
+/// Cuentas por cobrar/pagar (préstamos personales)
+model Receivable {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  personName  String   @map("person_name") @db.VarChar(100)
+  amount      Decimal  @db.Decimal(12,2)
+  currency    String   @default("NIO") @db.VarChar(3)  // Moneda del préstamo
+  type        String   @db.VarChar(20)     // "receivable" (me deben) | "payable" (debo)
+  description String?  @db.VarChar(255)
+  dueDate     DateTime? @map("due_date")
+  status      String   @default("pending") @db.VarChar(20) // "pending", "partial", "paid"
+  paidAmount  Decimal  @default(0) @map("paid_amount") @db.Decimal(12,2)
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  settledAt   DateTime? @map("settled_at")
+  
+  user User @relation(fields: [userId], references: [id])
+  
+  @@map("receivables")
+}
+
+/// Notificaciones de FlowControl
+model FlowNotification {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  type        String   @db.VarChar(30)  // "due_today", "overdue", "low_balance", "daily_prompt"
+  title       String   @db.VarChar(100)
+  message     String   @db.VarChar(500)
+  relatedId   String?  @map("related_id")  // ID de transacción relacionada
+  status      String   @default("unread") @db.VarChar(20) // "unread", "read", "dismissed"
+  createdAt   DateTime @default(now()) @map("created_at")
+  readAt      DateTime? @map("read_at")
+  
+  user User @relation(fields: [userId], references: [id])
+  
+  @@map("flow_notifications")
+}
+
+/// Configuración de FlowControl por usuario
+model FlowControlSettings {
+  id              String   @id @default(uuid())
+  userId          String   @unique @map("user_id")
+  exchangeRate    Decimal  @default(36.50) @map("exchange_rate") @db.Decimal(10,4)
+  displayCurrency String   @default("NIO") @map("display_currency") @db.VarChar(3)
+  updatedAt       DateTime @updatedAt @map("updated_at")
+  
+  user User @relation(fields: [userId], references: [id])
+  
+  @@map("flow_control_settings")
+}
+
+/// Deudas recurrentes (Préstamos)
+model Loan {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  name            String   @db.VarChar(100)
+  bank            String?  @db.VarChar(50)
+  principal       Decimal  @db.Decimal(12,2)
+  currentBalance  Decimal  @map("current_balance") @db.Decimal(12,2)
+  currency        String   @default("NIO") @db.VarChar(3)
+  interestRate    Decimal  @map("interest_rate") @db.Decimal(10,4) // Tasa anual
+  termMonths      Int      @map("term_months")
+  remainingMonths Int      @map("remaining_months")
+  startDate       DateTime @map("start_date")
+  paymentDay      Int      @map("payment_day")
+  monthlyPayment  Decimal  @map("monthly_payment") @db.Decimal(12,2)
+  insurance       Decimal  @default(0) @db.Decimal(12,2)
+  firstPaymentDate DateTime @default(now()) @map("first_payment_date")
+  interestRateType String   @default("ANNUAL") @map("interest_rate_type") @db.VarChar(20) // "ANNUAL", "MONTHLY"
+  calculationMethod String  @default("REDUCING_BALANCE") @map("calculation_method") @db.VarChar(30) // "REDUCING_BALANCE", "FLAT_RATE"
+  precision       Int      @default(2) @map("precision")
+  status          String   @default("active") @db.VarChar(20) // "active", "paid", "cancelled"
+  
+  user     User          @relation(fields: [userId], references: [id])
+  payments LoanPayment[]
+  
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("flow_loans")
+}
+
+/// Pagos de deudas (Cuotas)
+model LoanPayment {
+  id              String   @id @default(uuid())
+  loanId          String   @map("loan_id")
+  transactionId   String?  @map("transaction_id")
+  
+  paymentDate     DateTime @map("payment_date")
+  installmentNum  Int?     @map("installment_num") // Número de cuota
+  totalAmount     Decimal  @map("total_amount") @db.Decimal(12,2)
+  principalAmount Decimal  @map("principal_amount") @db.Decimal(12,2)
+  interestAmount  Decimal  @map("interest_amount") @db.Decimal(12,2)
+  feesAmount      Decimal  @map("fees_amount") @db.Decimal(12,2)
+  
+  // Seguimiento de variaciones respecto a lo teórico
+  expectedPrincipal Decimal? @map("expected_principal") @db.Decimal(12,2)
+  expectedInterest  Decimal? @map("expected_interest") @db.Decimal(12,2)
+  
+  isExtraPayment  Boolean  @default(false) @map("is_extra_payment")
+  notes           String?  @db.Text
+  
+  loan        Loan         @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id])
+  
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("flow_loan_payments")
+}
+
+model RecurringTransaction {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  accountId   String   @map("account_id")
+  categoryId  String?  @map("category_id")
+  
+  amount      Decimal  @db.Decimal(12,2)
+  currency    String   @default("NIO") @db.VarChar(3)
+  description String   @db.VarChar(255)
+  
+  frequency   String   @db.VarChar(20) // "daily", "weekly", "biweekly", "monthly", "yearly"
+  startDate   DateTime @map("start_date")
+  nextDueDate DateTime @map("next_due_date")
+  isActive    Boolean  @default(true) @map("is_active")
+  
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  user     User @relation(fields: [userId], references: [id])
+  account  FinancialAccount @relation(fields: [accountId], references: [id])
+  category TransactionCategory? @relation(fields: [categoryId], references: [id])
+  instances Transaction[]
+  
+  @@map("flow_recurring_transactions")
 }
 

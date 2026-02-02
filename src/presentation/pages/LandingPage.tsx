@@ -30,7 +30,7 @@ export function LandingPage() {
                 <div className="flex items-center gap-2 sm:gap-4">
                     {isAuthenticated ? (
                         <Link
-                            to="/dashboard"
+                            to="/smae/dashboard"
                             className="flex items-center gap-2 px-3 py-2 sm:px-5 sm:py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-base font-bold transition-all shadow-lg shadow-emerald-900/20"
                         >
                             <LayoutDashboard size={16} />
@@ -39,11 +39,11 @@ export function LandingPage() {
                         </Link>
                     ) : (
                         <>
-                            <Link to="/login" className="text-slate-400 hover:text-white text-xs sm:text-sm font-medium px-2 sm:px-4">
+                            <Link to="/smae/login" className="text-slate-400 hover:text-white text-xs sm:text-sm font-medium px-2 sm:px-4">
                                 Login
                             </Link>
                             <Link
-                                to="/login"
+                                to="/smae/login"
                                 className="px-3 py-2 sm:px-5 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs sm:text-base font-bold transition-all border border-slate-700"
                             >
                                 Empezar
@@ -71,7 +71,7 @@ export function LandingPage() {
 
                 <div className="flex flex-col sm:flex-row gap-4 mb-12 sm:mb-20 w-full max-w-xs sm:max-w-md">
                     <Link
-                        to="/login"
+                        to="/smae/login"
                         className="flex-1 px-6 py-3 sm:px-8 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-extrabold text-base sm:text-lg flex items-center justify-center gap-2 transition-all transform hover:scale-105 shadow-xl shadow-emerald-900/40"
                     >
                         Comenzar mi Grafo

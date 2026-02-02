@@ -137,6 +137,24 @@ export class ApiSkillRepository implements ISkillRepository {
         return skill;
     }
 
+    async createMany(skills: Omit<SkillData, 'id' | 'lastPracticed'>[]): Promise<Skill[]> {
+        const response = await fetch(`${API_BASE_URL}/skills/bulk`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ skills }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Error al crear múltiples skills');
+        }
+
+        const data: SkillData[] = await response.json();
+        const createdSkills = data.map(d => new Skill(d));
+        createdSkills.forEach(s => this.cache.set(s.id, s));
+        return createdSkills;
+    }
+
     // Métodos síncronos para compatibilidad
     save(skill: Skill): void {
         this.cache.set(skill.id, skill);

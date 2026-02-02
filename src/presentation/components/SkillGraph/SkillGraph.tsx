@@ -23,13 +23,16 @@ export function SkillGraph() {
     const containerRef = useRef<HTMLDivElement>(null);
     const lastMousePos = useRef({ x: 0, y: 0 });
 
-    // Centrar el grafo al inicio
+    // Centrar el grafo al inicio o cuando cambian las skills
     useEffect(() => {
         if (containerRef.current) {
-            const { clientWidth } = containerRef.current;
-            setOffset({ x: clientWidth / 2, y: 100 });
+            const { clientWidth, clientHeight } = containerRef.current;
+            // Si las coordenadas son 0, puede ser que el elemento aún no esté listo
+            if (clientWidth > 0) {
+                setOffset({ x: clientWidth / 2, y: 100 });
+            }
         }
-    }, []);
+    }, [skills.length]);
 
     const handleMouseDown = (e: React.MouseEvent) => {
         if (e.button !== 0) return; // Solo click izquierdo

@@ -31,7 +31,7 @@ interface AuthProviderProps {
  */
 export function AuthProvider({ children }: AuthProviderProps) {
     const [user, setUser] = useState<User | null>(null);
-    const [token, setToken] = useState<string | null>(() => localStorage.getItem('smae_token'));
+    const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'));
     const [isLoading, setIsLoading] = useState(true);
 
     // Verificar token al cargar
@@ -54,11 +54,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
                     setUser(userData);
                 } else {
                     // Token inválido, limpiar
-                    localStorage.removeItem('smae_token');
+                    localStorage.removeItem('token');
                     setToken(null);
                 }
             } catch {
-                localStorage.removeItem('smae_token');
+                localStorage.removeItem('token');
                 setToken(null);
             } finally {
                 setIsLoading(false);
@@ -82,7 +82,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 return { success: false, error: data.error || 'Error al iniciar sesión' };
             }
 
-            localStorage.setItem('smae_token', data.token);
+            localStorage.setItem('token', data.token);
             setToken(data.token);
             setUser(data.user);
             return { success: true };
@@ -105,7 +105,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 return { success: false, error: data.error || 'Error al registrarse' };
             }
 
-            localStorage.setItem('smae_token', data.token);
+            localStorage.setItem('token', data.token);
             setToken(data.token);
             setUser(data.user);
             return { success: true };
@@ -115,7 +115,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }, []);
 
     const logout = useCallback(() => {
-        localStorage.removeItem('smae_token');
+        localStorage.removeItem('token');
         setToken(null);
         setUser(null);
     }, []);
@@ -154,5 +154,5 @@ export function useAuth(): AuthContextType {
  * Obtener el token actual desde localStorage
  */
 export function getAuthToken(): string | null {
-    return localStorage.getItem('smae_token');
+    return localStorage.getItem('token');
 }

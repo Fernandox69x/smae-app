@@ -131,3 +131,83 @@ export async function sendCooldownEndEmail(
   }
 }
 
+/**
+ * Envía un email de contacto desde el formulario del portfolio
+ */
+export async function sendContactEmail(
+  senderName: string,
+  senderEmail: string,
+  subject: string,
+  message: string
+): Promise<{ success: boolean; error?: string }> {
+  // Email al que quieres recibir los mensajes de contacto
+  const CONTACT_EMAIL = process.env.CONTACT_EMAIL || 'tu@email.com';
+
+  try {
+    const { error } = await resend.emails.send({
+      from: 'Portfolio Contact <onboarding@resend.dev>',
+      to: [CONTACT_EMAIL],
+      replyTo: senderEmail,
+      subject: `[Portfolio] ${subject}`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; background: #f4f4f5; margin: 0; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; padding: 32px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+            .header { background: linear-gradient(to right, #10b981, #06b6d4); color: white; padding: 24px; border-radius: 12px 12px 0 0; margin: -32px -32px 24px -32px; }
+            .header h1 { margin: 0; font-size: 20px; }
+            .field { margin-bottom: 16px; }
+            .label { font-size: 12px; color: #6b7280; text-transform: uppercase; margin-bottom: 4px; }
+            .value { color: #18181b; font-size: 16px; }
+            .message { background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #10b981; }
+            .footer { margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 12px; color: #9ca3af; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>📬 Nuevo mensaje de contacto</h1>
+            </div>
+            
+            <div class="field">
+              <div class="label">De</div>
+              <div class="value"><strong>${senderName}</strong> (${senderEmail})</div>
+            </div>
+            
+            <div class="field">
+              <div class="label">Asunto</div>
+              <div class="value">${subject}</div>
+            </div>
+            
+            <div class="field">
+              <div class="label">Mensaje</div>
+              <div class="message">${message.replace(/\n/g, '<br>')}</div>
+            </div>
+            
+            <div class="footer">
+              Recibido desde tu Portfolio - ${new Date().toLocaleString('es-ES')}
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    });
+
+    if (error) {
+      console.error('Error enviando email de contacto:', error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error('Error en servicio de email:', err);
+    return { success: false, error: 'Error al enviar email' };
+  }
+}
+
+
+
+

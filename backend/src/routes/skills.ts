@@ -331,5 +331,71 @@ router.get('/active/count', async (req: AuthRequest, res: Response) => {
     }
 });
 
+/**
+ * POST /api/skills/bulk
+ * Crear múltiples skills a la vez (utilizado por el generador de rutas IA)
+ */
+router.post('/bulk', async (req: AuthRequest, res: Response) => {
+    try {
+        const { skills } = req.body;
+
+        if (!skills || !Array.isArray(skills)) {
+            return res.status(400).json({ error: 'Se requiere un array de skills' });
+        }
+
+        const createdSkills = [];
+
+        // Primero creamos todas las skills sin dependencias para tener sus IDs
+        for (const skillData of skills) {
+            const id = skillData.name.toLowerCase().replace(/\s+/g, '_') + '_' + Date.now().toString().slice(-4);
+
+            const skill = await prisma.skill.create({
+                data: {
+                    id,
+                    name: skillData.name,
+                    category: skillData.category,
+                    level: 0,
+                    currentLevel: 1,
+                    wip: false,
+                    x: Math.random() * 800 + 100,
+                    y: Math.random() * 600 + 100,
+                    userId: req.userId as string
+                }
+            });
+            createdSkills.push(skill);
+        }
+
+        // Ahora vinculamos las dependencias si las hay (esto es una simplificación)
+        // En una implementación real buscaríamos las dependencias por nombre en el array enviado
+        for (let i = 0; i < skills.length; i++) {
+            const originalData = skills[i];
+            const createdSkill = createdSkills[i];
+
+            if (originalData.dependencies && originalData.dependencies.length > 0) {
+                for (const depName of originalData.dependencies) {
+                    const depSkill = createdSkills.find(s => s.name === depName);
+                    if (depSkill) {
+                        try {
+                            await prisma.skillRequirement.create({
+                                data: {
+                                    skillId: createdSkill.id,
+                                    requirementId: depSkill.id
+                                }
+                            });
+                        } catch (e) {
+                            console.error(`Error linking dependency ${depName} for ${createdSkill.name}`);
+                        }
+                    }
+                }
+            }
+        }
+
+        res.status(201).json(createdSkills);
+    } catch (error) {
+        console.error('Error in bulk create:', error);
+        res.status(500).json({ error: 'Error al realizar la creación masiva' });
+    }
+});
+
 export default router;
 

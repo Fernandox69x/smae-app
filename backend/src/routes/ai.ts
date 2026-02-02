@@ -70,4 +70,24 @@ router.get('/suggest-steps/:skillId', async (req: AuthRequest, res: Response) =>
     }
 });
 
+/**
+ * POST /api/ai/generate-path
+ * Genera un camino completo de aprendizaje basado en un objetivo
+ */
+router.post('/generate-path', async (req: AuthRequest, res: Response) => {
+    try {
+        const { goal } = req.body;
+
+        if (!goal) {
+            return res.status(400).json({ error: 'El objetivo es obligatorio' });
+        }
+
+        const path = await AIService.generatePath(goal);
+        res.json(path);
+    } catch (error) {
+        console.error('Error generating AI path:', error);
+        res.status(500).json({ error: 'Error al generar la ruta de aprendizaje con IA' });
+    }
+});
+
 export default router;

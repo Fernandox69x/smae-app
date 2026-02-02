@@ -32,7 +32,7 @@ export function useValidations(skillId?: string) {
     const [error, setError] = useState<string | null>(null);
 
     const getAuthHeaders = () => {
-        const token = localStorage.getItem('smae_token');
+        const token = localStorage.getItem('token');
         return {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`
