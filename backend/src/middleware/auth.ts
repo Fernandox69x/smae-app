@@ -78,12 +78,17 @@ export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; email?: string };
+        const userEmail = decoded.email?.toLowerCase().trim();
+        const adminEmail = (process.env.ADMIN_EMAIL || '').toLowerCase().trim();
 
-        // Get user email from token or check if it matches admin email
-        if (decoded.email !== ADMIN_EMAIL) {
+        console.log(`[ADMIN_CHECK] User Email: "${userEmail}", Admin Email: "${adminEmail}"`);
+
+        if (!userEmail || !adminEmail || userEmail !== adminEmail) {
+            console.log('[ADMIN_CHECK] Access DENIED');
             return res.status(403).json({ error: 'Acceso denegado: se requieren permisos de administrador' });
         }
 
+        console.log('[ADMIN_CHECK] Access GRANTED');
         req.userId = decoded.userId;
         (req as any).isAdmin = true;
         next();
