@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@presentation/context/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 // Portfolio Pages
 import { PortfolioHomePage, ProjectsPage, AboutPage, ContactPage } from '@presentation/pages/portfolio';
@@ -158,6 +159,7 @@ export default function App() {
         <BrowserRouter>
             <AuthProvider>
                 <AppRoutes />
+                <SpeedInsights />
             </AuthProvider>
         </BrowserRouter>
     );
