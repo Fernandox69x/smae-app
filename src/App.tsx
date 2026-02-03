@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@presentation/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 
@@ -31,6 +31,7 @@ import { ResetPasswordPage } from '@presentation/pages/ResetPasswordPage';
 function AppRoutes() {
     const { isAuthenticated, isLoading } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     if (isLoading) {
         return (
@@ -55,23 +56,23 @@ function AppRoutes() {
             {/* ===================== */}
             <Route
                 path="/admin"
-                element={isAuthenticated ? <AdminDashboard /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <AdminDashboard /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/admin/social-links"
-                element={isAuthenticated ? <AdminSocialLinks /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <AdminSocialLinks /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/admin/contacts"
-                element={isAuthenticated ? <AdminContacts /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <AdminContacts /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/admin/config"
-                element={isAuthenticated ? <AdminConfig /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <AdminConfig /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/admin/projects"
-                element={isAuthenticated ? <AdminProjects /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <AdminProjects /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
 
             {/* ===================== */}
@@ -79,35 +80,35 @@ function AppRoutes() {
             {/* ===================== */}
             <Route
                 path="/flowcontrol"
-                element={isAuthenticated ? <FlowControlDashboard /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <FlowControlDashboard /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/flowcontrol/accounts"
-                element={isAuthenticated ? <AccountsPage /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <AccountsPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/flowcontrol/transactions"
-                element={isAuthenticated ? <TransactionsPage /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <TransactionsPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/flowcontrol/receivables"
-                element={isAuthenticated ? <ReceivablesPage /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <ReceivablesPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/flowcontrol/categories"
-                element={isAuthenticated ? <CategoriesPage /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <CategoriesPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/flowcontrol/loans"
-                element={isAuthenticated ? <LoansPage /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <LoansPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/flowcontrol/loans/:id"
-                element={isAuthenticated ? <LoanDetailsPage /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <LoanDetailsPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
             <Route
                 path="/flowcontrol/recurring"
-                element={isAuthenticated ? <RecurringTransactionsPage /> : <Navigate to="/smae/login" replace />}
+                element={isAuthenticated ? <RecurringTransactionsPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
 
             {/* ===================== */}
@@ -121,8 +122,8 @@ function AppRoutes() {
                 path="/smae/login"
                 element={
                     isAuthenticated
-                        ? <Navigate to="/smae/dashboard" replace />
-                        : <AuthPage onSuccess={() => navigate('/smae/dashboard')} />
+                        ? <Navigate to={location.state?.from?.pathname || "/smae/dashboard"} replace />
+                        : <AuthPage onSuccess={() => navigate(location.state?.from?.pathname || '/smae/dashboard')} />
                 }
             />
             <Route path="/smae/forgot-password" element={<ForgotPasswordPage />} />
@@ -134,7 +135,7 @@ function AppRoutes() {
                 element={
                     isAuthenticated
                         ? <DashboardPage />
-                        : <Navigate to="/smae/login" replace />
+                        : <Navigate to="/smae/login" replace state={{ from: location }} />
                 }
             />
 
