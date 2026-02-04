@@ -140,9 +140,29 @@ export default function TransactionsPage() {
     }, [transactions, searchTerm, accountFilter, categoryFilter, dateFrom, dateTo]);
 
     const { recurringPending, mainHistory } = useMemo(() => {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+        const currentMonthRecurring = filteredTransactions.filter(tx =>
+            tx.status === 'pending' &&
+            tx.recurringTransactionId &&
+            new Date(tx.dueDate) >= startOfMonth &&
+            new Date(tx.dueDate) <= endOfMonth
+        );
+
+        const history = filteredTransactions.filter(tx => {
+            const isApplied = tx.status === 'applied';
+            const isManualPending = tx.status === 'pending' && !tx.recurringTransactionId;
+            const isOldRecurringPending = tx.status === 'pending' && tx.recurringTransactionId && new Date(tx.dueDate) < startOfMonth;
+            const isFutureRecurringPending = tx.status === 'pending' && tx.recurringTransactionId && new Date(tx.dueDate) > endOfMonth;
+
+            return isApplied || isManualPending || isOldRecurringPending || isFutureRecurringPending;
+        });
+
         return {
-            recurringPending: filteredTransactions.filter(tx => tx.status === 'pending' && tx.recurringTransactionId),
-            mainHistory: filteredTransactions.filter(tx => tx.status === 'applied' || (tx.status === 'pending' && !tx.recurringTransactionId))
+            recurringPending: currentMonthRecurring,
+            mainHistory: history
         };
     }, [filteredTransactions]);
 

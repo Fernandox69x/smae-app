@@ -5,9 +5,48 @@ const prisma = new PrismaClient();
 
 export class FlowControlService {
     /**
+     * Elimina duplicados de transacciones recurrentes pendientes
+     * (Misma plantilla y mismo día)
+     */
+    static async cleanupDuplicateRecurringTransactions(userId: string) {
+        const pending = await prisma.transaction.findMany({
+            where: {
+                userId,
+                status: 'pending',
+                recurringTransactionId: { not: null }
+            },
+            orderBy: { dueDate: 'asc' }
+        });
+
+        const seen = new Set<string>();
+        const toDelete: string[] = [];
+
+        for (const tx of pending) {
+            const dateStr = new Date(tx.dueDate).toISOString().split('T')[0];
+            const key = `${tx.recurringTransactionId}_${dateStr}`;
+
+            if (seen.has(key)) {
+                toDelete.push(tx.id);
+            } else {
+                seen.add(key);
+            }
+        }
+
+        if (toDelete.length > 0) {
+            console.log(`Eliminando ${toDelete.length} deudas recurrentes duplicadas para usuario ${userId}`);
+            await prisma.transaction.deleteMany({
+                where: { id: { in: toDelete } }
+            });
+        }
+    }
+
+    /**
      * Procesa las transacciones recurrentes y genera las instancias pendientes
      */
     static async processRecurringTransactions(userId: string) {
+        // 1. Limpiar duplicados existentes primero
+        await this.cleanupDuplicateRecurringTransactions(userId);
+
         const today = new Date();
         const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
 
