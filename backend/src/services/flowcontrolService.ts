@@ -22,6 +22,7 @@ export class FlowControlService {
         const toDelete: string[] = [];
 
         for (const tx of pending) {
+            // Normalizar a fecha UTC para agrupar duplicados de forma consistente
             const dateStr = new Date(tx.dueDate).toISOString().split('T')[0];
             const key = `${tx.recurringTransactionId}_${dateStr}`;
 
@@ -33,7 +34,7 @@ export class FlowControlService {
         }
 
         if (toDelete.length > 0) {
-            console.log(`Eliminando ${toDelete.length} deudas recurrentes duplicadas para usuario ${userId}`);
+            console.log(`[CLEANUP] Eliminando ${toDelete.length} duplicados para usuario ${userId}`);
             await prisma.transaction.deleteMany({
                 where: { id: { in: toDelete } }
             });
@@ -48,7 +49,7 @@ export class FlowControlService {
         await this.cleanupDuplicateRecurringTransactions(userId);
 
         const today = new Date();
-        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
 
         const recurringTemplates = await prisma.recurringTransaction.findMany({
             where: { userId, isActive: true, nextDueDate: { lte: endOfMonth } }
@@ -57,29 +58,66 @@ export class FlowControlService {
         if (recurringTemplates.length === 0) return;
 
         for (const template of recurringTemplates) {
-            let nextDue = new Date(template.nextDueDate);
+            const instancesToCreate: Date[] = [];
+            const currentTemplateDueDate = template.nextDueDate;
+            let calculatingNextDue = new Date(template.nextDueDate);
 
-            // Generar instancias hasta que el próximo vencimiento sea fuera del mes actual
-            while (nextDue <= endOfMonth) {
-                // Verificar si ya existe una instancia para esta fecha y plantilla
-                // Usamos un rango de fecha para evitar problemas con la hora exacta
-                const startOfDay = new Date(nextDue);
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(nextDue);
-                endOfDay.setHours(23, 59, 59, 999);
+            // Calcular todas las instancias hasta el fin de mes
+            while (calculatingNextDue <= endOfMonth) {
+                instancesToCreate.push(new Date(calculatingNextDue));
+
+                const currentDue = new Date(calculatingNextDue);
+                switch (template.frequency) {
+                    case 'daily':
+                        calculatingNextDue.setDate(currentDue.getDate() + 1);
+                        break;
+                    case 'weekly':
+                        calculatingNextDue.setDate(currentDue.getDate() + 7);
+                        break;
+                    case 'biweekly':
+                        calculatingNextDue.setDate(currentDue.getDate() + 14);
+                        break;
+                    case 'monthly':
+                        calculatingNextDue.setMonth(currentDue.getMonth() + 1);
+                        break;
+                    case 'yearly':
+                        calculatingNextDue.setFullYear(currentDue.getFullYear() + 1);
+                        break;
+                    default:
+                        calculatingNextDue.setFullYear(currentDue.getFullYear() + 100);
+                        break;
+                }
+            }
+
+            // ATOMIC LOCK: Solo procedemos si ninguna otra instancia ha movido el nextDueDate
+            const updateResult = await prisma.recurringTransaction.updateMany({
+                where: { id: template.id, nextDueDate: currentTemplateDueDate },
+                data: { nextDueDate: calculatingNextDue }
+            });
+
+            if (updateResult.count === 0) {
+                console.log(`[RECURRING] Concurrencia detectada para template ${template.id}, saltando.`);
+                continue;
+            }
+
+            // Hemos "ganado" el lock para generar estas instancias
+            for (const instanceDate of instancesToCreate) {
+                // Normalizar a medianoche UTC
+                const normalizedDate = new Date(instanceDate);
+                normalizedDate.setUTCHours(0, 0, 0, 0);
+
+                const startOfDay = new Date(normalizedDate);
+                const endOfDay = new Date(normalizedDate);
+                endOfDay.setUTCHours(23, 59, 59, 999);
 
                 const existingInstance = await prisma.transaction.findFirst({
                     where: {
                         recurringTransactionId: template.id,
-                        dueDate: {
-                            gte: startOfDay,
-                            lte: endOfDay
-                        }
+                        dueDate: { gte: startOfDay, lte: endOfDay }
                     }
                 });
 
                 if (!existingInstance) {
-                    // Crear la instancia de la transacción
                     await prisma.transaction.create({
                         data: {
                             userId: template.userId,
@@ -88,43 +126,14 @@ export class FlowControlService {
                             amount: template.amount,
                             currency: template.currency,
                             description: template.description,
-                            dueDate: new Date(nextDue),
+                            dueDate: normalizedDate,
                             status: 'pending',
                             recurringTransactionId: template.id as any,
                             notes: 'Generado automáticamente (Recurrente)'
                         } as any
                     });
                 }
-
-                // Calcular la próxima fecha según la frecuencia
-                const currentDue = new Date(nextDue);
-                switch (template.frequency) {
-                    case 'daily':
-                        nextDue.setDate(currentDue.getDate() + 1);
-                        break;
-                    case 'weekly':
-                        nextDue.setDate(currentDue.getDate() + 7);
-                        break;
-                    case 'biweekly':
-                        nextDue.setDate(currentDue.getDate() + 14);
-                        break;
-                    case 'monthly':
-                        nextDue.setMonth(currentDue.getMonth() + 1);
-                        break;
-                    case 'yearly':
-                        nextDue.setFullYear(currentDue.getFullYear() + 1);
-                        break;
-                    default:
-                        nextDue.setFullYear(currentDue.getFullYear() + 100);
-                        break;
-                }
             }
-
-            // Actualizar la plantilla con la próxima fecha prevista
-            await prisma.recurringTransaction.update({
-                where: { id: template.id },
-                data: { nextDueDate: nextDue }
-            });
         }
     }
 
