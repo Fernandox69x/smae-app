@@ -9,6 +9,7 @@ import aiRoutes from './routes/ai';
 import contactRoutes from './routes/contact';
 import adminRoutes from './routes/admin';
 import flowcontrolRoutes from './routes/flowcontrol';
+import shoppingRoutes from './routes/shopping';
 import { NotificationService } from './services/notificationService';
 import { authMiddleware } from './middleware/auth';
 import { CronService } from './services/CronService';
@@ -50,6 +51,7 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/flowcontrol', authMiddleware, flowcontrolRoutes);
+app.use('/api/shopping', authMiddleware, shoppingRoutes);
 
 // Public endpoints for portfolio
 app.get('/api/public/social-links', async (req, res) => {

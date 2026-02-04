@@ -110,6 +110,20 @@ export class LoanService {
     }
 
     /**
+     * Elimina un préstamo
+     */
+    static async deleteLoan(id: string, userId: string) {
+        const loan = await (prisma as any).loan.findFirst({ where: { id, userId } });
+        if (!loan) throw new Error('Préstamo no encontrado');
+
+        await (prisma as any).loan.delete({
+            where: { id }
+        });
+
+        return { success: true };
+    }
+
+    /**
      * Obtiene todos los préstamos del usuario
      */
     static async getLoans(userId: string) {
@@ -245,6 +259,67 @@ export class LoanService {
         }
 
         return { loanPayment, transaction };
+    }
+
+    /**
+     * Elimina un pago y revierte los saldos
+     */
+    static async deletePayment(loanId: string, paymentId: string, userId: string) {
+        const loan = await (prisma as any).loan.findFirst({ where: { id: loanId, userId } });
+        if (!loan) throw new Error('Préstamo no encontrado');
+
+        const payment = await (prisma as any).loanPayment.findFirst({
+            where: { id: paymentId, loanId },
+            include: { transaction: true }
+        });
+
+        if (!payment) throw new Error('Pago no encontrado');
+
+        // 1. Revertir saldo del préstamo
+        const principalReversed = Number(payment.principalAmount);
+        const newLoanBalance = Number(loan.currentBalance) + principalReversed;
+
+        // Si estaba pagado, volver a activar
+        const statusUpdate = loan.status === 'paid' ? 'active' : undefined;
+
+        await (prisma as any).loan.update({
+            where: { id: loanId },
+            data: {
+                currentBalance: newLoanBalance,
+                ...(statusUpdate && { status: statusUpdate }),
+                // Si no era extra, devolver el mes. Si era extra, no sé si cambió el plazo, 
+                // pero por seguridad asumimos que fue cuota normal si no tiene flag
+                remainingMonths: !payment.isExtraPayment
+                    ? { increment: 1 }
+                    : undefined
+            }
+        });
+
+        // 2. Revertir saldo de la cuenta bancaria (Ingreso de vuelta)
+        if (payment.transactionId) {
+            const transaction = await prisma.transaction.findUnique({
+                where: { id: payment.transactionId }
+            });
+
+            if (transaction) {
+                // El pago fue un egreso (negativo). Para revertir, sumamos el valor absoluto (ingreso).
+                // Ojo: updateAccountBalance recibe el monto del cambio.
+                // Si pagué 100, transaction.amount = -100.
+                // Quiero recuperar 100.
+                const amountToRestore = Math.abs(Number(transaction.amount));
+                await FlowControlService.updateAccountBalance(transaction.accountId, amountToRestore, true);
+
+                // Eliminar la transacción
+                await prisma.transaction.delete({ where: { id: transaction.id } });
+            }
+        }
+
+        // 3. Eliminar el registro de pago
+        await (prisma as any).loanPayment.delete({
+            where: { id: paymentId }
+        });
+
+        return { success: true };
     }
 
     /**

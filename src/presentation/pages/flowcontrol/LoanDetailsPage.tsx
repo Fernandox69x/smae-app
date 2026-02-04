@@ -15,11 +15,13 @@ import {
     Calculator,
     TrendingUp,
     Clock,
-    Download
+    Download,
+    Trash2
 } from 'lucide-react';
 import { config } from '../../../config';
 import { CalculatorInput } from '../../components/flowcontrol/CalculatorInput';
 import { ExportService } from '../../../infrastructure/services/ExportService';
+import { DateUtils } from '../../../infrastructure/utils/dateUtils';
 
 interface Account {
     id: string;
@@ -225,6 +227,40 @@ export default function LoanDetailsPage() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!confirm('¿Estás seguro de que deseas eliminar este préstamo? Se perderá el historial de pagos asociados, aunque las transacciones monetarias se mantendrán en tu registro.')) return;
+
+        try {
+            const res = await fetch(`${config.API_URL}/flowcontrol/loans/${id}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                window.location.href = '/flowcontrol/loans';
+            }
+        } catch (error) {
+            console.error('Error deleting loan:', error);
+        }
+    };
+
+    const handleDeletePayment = async (paymentId: string) => {
+        if (!confirm('¿Estás seguro de que deseas eliminar este pago? Se revertirán los saldos asociados.')) return;
+
+        try {
+            const res = await fetch(`${config.API_URL}/flowcontrol/loans/${id}/payments/${paymentId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                fetchData(); // Recargar datos para ver saldos actualizados
+            }
+        } catch (error) {
+            console.error('Error deleting payment:', error);
+        }
+    };
+
     const nextPaymentDate = useMemo(() => {
         if (!loan) return null;
         const today = new Date();
@@ -234,12 +270,27 @@ export default function LoanDetailsPage() {
         if (today < firstPayment) return firstPayment;
 
         // Si hoy es después del primer pago, calcular la próxima basada en el paymentDay
-        let nextDate = new Date(today.getFullYear(), today.getMonth(), loan.paymentDay);
-        // Si ya pasó el día en este mes, es el próximo mes
-        if (nextDate < today) {
-            nextDate.setMonth(nextDate.getMonth() + 1);
+        let candidateDate = new Date(today.getFullYear(), today.getMonth(), loan.paymentDay);
+
+        // Si ya pasó el día en este mes, evaluar el próximo mes inicialmente
+        if (candidateDate < today) {
+            candidateDate.setMonth(candidateDate.getMonth() + 1);
         }
-        return nextDate;
+
+        // CRITICAL FIX: Verificar si YA EXISTE un pago para ese mes/año candidato
+        // Esto evita que salga "20 Feb" si ya pagaste la cuota de Febrero
+        const hasPaidCandidateMonth = loan.payments.some(p => {
+            if (p.isExtraPayment) return false; // Ignorar abonos extra
+            const pDate = new Date(p.paymentDate);
+            return pDate.getFullYear() === candidateDate.getFullYear() &&
+                pDate.getMonth() === candidateDate.getMonth();
+        });
+
+        if (hasPaidCandidateMonth) {
+            candidateDate.setMonth(candidateDate.getMonth() + 1);
+        }
+
+        return candidateDate;
     }, [loan]);
 
     const theoreticalSchedule = useMemo(() => {
@@ -428,6 +479,13 @@ export default function LoanDetailsPage() {
                         >
                             <Settings size={20} />
                         </button>
+                        <button
+                            onClick={handleDelete}
+                            className="p-2.5 bg-slate-900 hover:bg-slate-800 text-rose-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl border border-slate-800 transition-all"
+                            title="Eliminar Préstamo"
+                        >
+                            <Trash2 size={20} />
+                        </button>
                         {loan.status === 'active' && (
                             <button
                                 onClick={() => setShowPaymentModal(true)}
@@ -506,7 +564,7 @@ export default function LoanDetailsPage() {
 
                             <div className="p-2 overflow-x-auto">
                                 {activeTab === 'history' && (
-                                    <table className="w-full text-left">
+                                    <table className="w-full text-left min-w-[600px]">
                                         <thead>
                                             <tr className="text-[10px] text-slate-500 uppercase font-black border-b border-slate-800">
                                                 <th className="px-4 py-3">Fecha</th>
@@ -545,6 +603,15 @@ export default function LoanDetailsPage() {
                                                                 </span>
                                                             )}
                                                         </div>
+                                                    </td>
+                                                    <td className="px-4 py-4 text-right">
+                                                        <button
+                                                            onClick={() => handleDeletePayment(p.id)}
+                                                            className="p-1 hover:bg-rose-500/20 text-slate-600 hover:text-rose-500 rounded transition-colors"
+                                                            title="Eliminar pago"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -962,10 +1029,9 @@ export default function LoanDetailsPage() {
                     </div>
                 )}
 
-                {/* Register Payment Modal */}
                 {showPaymentModal && (
                     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg p-6 md:p-8 shadow-2xl">
+                        <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-lg p-6 md:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
                             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
                                 <Receipt className="text-emerald-500" /> Registrar Pago
                             </h2>

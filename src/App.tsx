@@ -17,6 +17,7 @@ import CategoriesPage from './presentation/pages/flowcontrol/CategoriesPage';
 import LoansPage from './presentation/pages/flowcontrol/LoansPage';
 import LoanDetailsPage from './presentation/pages/flowcontrol/LoanDetailsPage';
 import RecurringTransactionsPage from './presentation/pages/flowcontrol/RecurringTransactionsPage';
+import ShoppingListPage from './presentation/pages/flowcontrol/ShoppingListPage';
 
 // SMAE Pages
 import { LandingPage } from '@presentation/pages/LandingPage';
@@ -109,6 +110,10 @@ function AppRoutes() {
             <Route
                 path="/flowcontrol/recurring"
                 element={isAuthenticated ? <RecurringTransactionsPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
+            />
+            <Route
+                path="/flowcontrol/shopping"
+                element={isAuthenticated ? <ShoppingListPage /> : <Navigate to="/smae/login" replace state={{ from: location }} />}
             />
 
             {/* ===================== */}

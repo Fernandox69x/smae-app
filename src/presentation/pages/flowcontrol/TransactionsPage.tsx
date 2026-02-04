@@ -20,6 +20,7 @@ import { config } from '../../../config';
 import DualCurrency, { useCurrencySettings } from '../../components/DualCurrency/DualCurrency';
 import { CalculatorInput } from '../../components/flowcontrol/CalculatorInput';
 import { ExportService } from '../../../infrastructure/services/ExportService';
+import { DateUtils } from '../../../infrastructure/utils/dateUtils';
 
 interface Transaction {
     id: string;
@@ -279,7 +280,8 @@ export default function TransactionsPage() {
     };
 
     const isOverdue = (dueDate: string, status: string) => {
-        return status === 'pending' && new Date(dueDate) < new Date();
+        const today = DateUtils.getTodayString();
+        return status === 'pending' && DateUtils.isBefore(dueDate.split('T')[0], today);
     };
 
     if (loading) {
@@ -424,7 +426,7 @@ export default function TransactionsPage() {
                 {/* Form Modal */}
                 {showForm && (
                     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-                        <div className="bg-slate-900 p-6 rounded-xl w-full max-w-md border border-slate-800">
+                        <div className="bg-slate-900 p-6 rounded-xl w-full max-w-md border border-slate-800 max-h-[90vh] overflow-y-auto">
                             <h2 className="text-xl font-bold mb-6">
                                 {editingTxId ? 'Editar Transacción' : 'Nueva Transacción'}
                             </h2>
@@ -577,8 +579,8 @@ export default function TransactionsPage() {
                 )}
 
                 {/* Transactions List */}
-                <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-                    <table className="w-full">
+                <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-x-auto">
+                    <table className="w-full min-w-[800px]">
                         <thead className="bg-slate-800">
                             <tr>
                                 <th className="text-left p-4 text-sm text-slate-400 font-medium">Estado</th>

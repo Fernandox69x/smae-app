@@ -33,6 +33,7 @@ model User {
   flowControlSettings    FlowControlSettings?
   loans                  Loan[]
   recurringTransactions  RecurringTransaction[]
+  shoppingItems          ShoppingItem[]
 
   @@map("users")
 }
@@ -456,5 +457,47 @@ model RecurringTransaction {
   instances Transaction[]
   
   @@map("flow_recurring_transactions")
+}
+
+/// Elementos de la despensa / lista de compras
+model ShoppingItem {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String   @db.VarChar(100)
+  category    String?  @db.VarChar(50)     // "Lácteos", "Limpieza", etc.
+  
+  isInStock   Boolean  @default(true) @map("is_in_stock")
+  priority    String   @default("medium") @db.VarChar(20) // "low", "medium", "high"
+  
+  targetQuantity Decimal? @map("target_quantity") @db.Decimal(10,2)
+  unit           String?  @db.VarChar(20)     // "litros", "kg", "unidades"
+  
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  
+  user     User @relation(fields: [userId], references: [id])
+  history  PurchaseHistory[]
+  
+  @@unique([id, userId])
+  @@map("flow_shopping_items")
+}
+
+/// Historial de precios y compras por producto
+model PurchaseHistory {
+  id             String   @id @default(uuid())
+  shoppingItemId String   @map("shopping_item_id")
+  
+  price          Decimal  @db.Decimal(12,2)
+  currency       String   @default("NIO") @db.VarChar(3)
+  store          String   @db.VarChar(100)    // "Walmart", "La Colonia", "Pulpería"
+  purchaseDate   DateTime @default(now()) @map("purchase_date")
+  
+  quantity       Decimal? @db.Decimal(10,2)
+  notes          String?  @db.Text
+  
+  item ShoppingItem @relation(fields: [shoppingItemId], references: [id], onDelete: Cascade)
+  
+  @@map("flow_purchase_history")
 }
 

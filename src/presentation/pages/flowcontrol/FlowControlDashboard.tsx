@@ -17,11 +17,13 @@ import {
     Tag,
     PiggyBank,
     Repeat,
-    Calculator
+    Calculator,
+    ShoppingBag
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
 import { config } from '../../../config';
 import DualCurrency from '../../components/DualCurrency/DualCurrency';
+import FinancialAdvisor from '../../components/flowcontrol/FinancialAdvisor';
 
 interface Account {
     id: string;
@@ -290,6 +292,11 @@ export default function FlowControlDashboard() {
                     </div>
                 ) : null}
 
+                {/* AI Advisor */}
+                <div className="mb-6">
+                    <FinancialAdvisor />
+                </div>
+
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Chart Column */}
                     <div className="lg:col-span-2 space-y-6">
@@ -447,6 +454,13 @@ export default function FlowControlDashboard() {
                                 >
                                     <Plus size={18} className="text-emerald-400" />
                                     <span>Nueva Transacción</span>
+                                </Link>
+                                <Link
+                                    to="/flowcontrol/shopping"
+                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                                >
+                                    <ShoppingBag size={18} className="text-amber-400" />
+                                    <span>Lista de Compras</span>
                                 </Link>
                                 <Link
                                     to="/flowcontrol/recurring"

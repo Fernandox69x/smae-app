@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { FlowControlService } from '../services/flowcontrolService';
 import { LoanService } from '../services/loanService';
+import { AIAdvisorService } from '../services/aiAdvisorService';
 
 const prisma = new PrismaClient();
 const router = Router();
@@ -157,6 +158,30 @@ router.put('/loans/:id', async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error('Error updating loan:', error);
         res.status(500).json({ error: error.message || 'Error al actualizar préstamo' });
+    }
+});
+
+// DELETE loan
+router.delete('/loans/:id', async (req: Request, res: Response) => {
+    try {
+        const userId = String(getUserId(req));
+        await LoanService.deleteLoan(String(req.params.id), userId);
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Error deleting loan:', error);
+        res.status(error.message === 'Préstamo no encontrado' ? 404 : 500).json({ error: error.message || 'Error al eliminar préstamo' });
+    }
+});
+
+// DELETE loan payment (and revert balance)
+router.delete('/loans/:id/payments/:paymentId', async (req: Request, res: Response) => {
+    try {
+        const userId = String(getUserId(req));
+        await LoanService.deletePayment(String(req.params.id), String(req.params.paymentId), userId);
+        res.json({ success: true });
+    } catch (error: any) {
+        console.error('Error deleting payment:', error);
+        res.status(error.message === 'Pago no encontrado' ? 404 : 500).json({ error: error.message || 'Error al eliminar pago' });
     }
 });
 
@@ -717,6 +742,21 @@ router.post('/send-statement', async (req: Request, res: Response) => {
     } catch (error: any) {
         console.error('Error in send-statement endpoint:', error);
         res.status(500).json({ error: error.message || 'Error al procesar el envío de correo' });
+    }
+});
+
+/**
+ * GET /api/flowcontrol/ai-advice
+ * Obtener consejos financieros personalizados con IA
+ */
+router.get('/ai-advice', async (req: Request, res: Response) => {
+    try {
+        const userId = getUserId(req);
+        const advice = await AIAdvisorService.getFinancialAdvice(userId);
+        res.json(advice);
+    } catch (error: any) {
+        console.error('Error fetching AI advice:', error);
+        res.status(500).json({ error: error.message || 'Error al obtener consejos de la IA' });
     }
 });
 
