@@ -262,6 +262,8 @@ router.post('/transactions', async (req: Request, res: Response) => {
                 accountId,
                 categoryId,
                 amount,
+                currency: req.body.currency || 'NIO',
+                exchangeRate: req.body.exchangeRate ? Number(req.body.exchangeRate) : null,
                 description,
                 dueDate: new Date(dueDate),
                 isRecurring: isRecurring || false,

@@ -34,6 +34,7 @@ interface Transaction {
     category: { name: string; color: string; icon: string } | null;
     accountId?: string;
     categoryId?: string;
+    recurringTransactionId?: string;
 }
 
 interface Account {
@@ -68,6 +69,12 @@ export default function TransactionsPage() {
     const [categoryFilter, setCategoryFilter] = useState('all');
     const [loading, setLoading] = useState(true);
     const [showExportMenu, setShowExportMenu] = useState(false);
+
+    // Apply Modal State
+    const [showApplyModal, setShowApplyModal] = useState(false);
+    const [txToApply, setTxToApply] = useState<Transaction | null>(null);
+    const [applyAccountId, setApplyAccountId] = useState('');
+    const [isApplying, setIsApplying] = useState(false);
 
     const exportService = useMemo(() => new ExportService(), []);
 
@@ -132,6 +139,13 @@ export default function TransactionsPage() {
         });
     }, [transactions, searchTerm, accountFilter, categoryFilter, dateFrom, dateTo]);
 
+    const { recurringPending, mainHistory } = useMemo(() => {
+        return {
+            recurringPending: filteredTransactions.filter(tx => tx.status === 'pending' && tx.recurringTransactionId),
+            mainHistory: filteredTransactions.filter(tx => tx.status === 'applied' || (tx.status === 'pending' && !tx.recurringTransactionId))
+        };
+    }, [filteredTransactions]);
+
     const fetchData = async () => {
         try {
             const headers = { 'Authorization': `Bearer ${token}` };
@@ -192,6 +206,8 @@ export default function TransactionsPage() {
                 body: JSON.stringify({
                     ...newTx,
                     amount,
+                    currency: newTx.currency,
+                    exchangeRate: newTx.exchangeRate,
                     categoryId: newTx.categoryId || undefined
                 })
             });
@@ -217,6 +233,20 @@ export default function TransactionsPage() {
     };
 
     const toggleStatus = async (id: string) => {
+        const tx = transactions.find(t => t.id === id);
+        if (!tx) return;
+
+        // If it's pending, we open the "Apply Modal" to select account
+        if (tx.status === 'pending') {
+            setTxToApply(tx);
+            setApplyAccountId(tx.accountId || '');
+            setShowApplyModal(true);
+            return;
+        }
+
+        // If it's applied, we just revert to pending (confirming)
+        if (!confirm('¿Deseas marcar esta transacción como PENDIENTE? Se revertirá el impacto en el saldo.')) return;
+
         try {
             await fetch(`${config.API_URL}/flowcontrol/transactions/${id}/toggle`, {
                 method: 'PUT',
@@ -224,7 +254,36 @@ export default function TransactionsPage() {
             });
             fetchData();
         } catch (err) {
-            console.error('Error:', err);
+            console.error('Error toggling status:', err);
+        }
+    };
+
+    const confirmApply = async () => {
+        if (!txToApply || !applyAccountId) return;
+        setIsApplying(true);
+
+        try {
+            const res = await fetch(`${config.API_URL}/flowcontrol/transactions/${txToApply.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    status: 'applied',
+                    accountId: applyAccountId
+                })
+            });
+
+            if (res.ok) {
+                setShowApplyModal(false);
+                setTxToApply(null);
+                fetchData();
+            }
+        } catch (err) {
+            console.error('Error applying transaction:', err);
+        } finally {
+            setIsApplying(false);
         }
     };
 
@@ -578,6 +637,109 @@ export default function TransactionsPage() {
                     </div>
                 )}
 
+                {/* Apply Confirmation Modal */}
+                {showApplyModal && txToApply && (
+                    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+                        <div className="bg-slate-900 p-6 rounded-xl w-full max-w-sm border border-slate-800 shadow-2xl">
+                            <h3 className="text-xl font-bold mb-2 flex items-center gap-2 text-emerald-400">
+                                <Check size={20} /> Aplicar Pago
+                            </h3>
+                            <p className="text-sm text-slate-400 mb-6">
+                                "{txToApply.description}" por <strong>{txToApply.currency} {Math.abs(txToApply.amount).toLocaleString()}</strong>
+                            </p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm text-slate-400 mb-1">Pagar desde la cuenta:</label>
+                                    <select
+                                        value={applyAccountId}
+                                        onChange={e => setApplyAccountId(e.target.value)}
+                                        className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:border-emerald-500 outline-none"
+                                    >
+                                        <option value="">Seleccionar cuenta...</option>
+                                        {accounts
+                                            .filter(acc => acc.currency === txToApply.currency || acc.type === 'cash') // Simplified filter
+                                            .map(acc => (
+                                                <option key={acc.id} value={acc.id}>
+                                                    {acc.name} (Saldo: {acc.currency === 'USD' ? '$' : 'C$'} {acc.balance.toLocaleString()})
+                                                </option>
+                                            ))}
+                                    </select>
+                                </div>
+
+                                <div className="flex gap-3 pt-2">
+                                    <button
+                                        onClick={() => setShowApplyModal(false)}
+                                        className="flex-1 p-2 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors text-sm"
+                                        disabled={isApplying}
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        onClick={confirmApply}
+                                        className="flex-1 p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors text-sm font-bold disabled:opacity-50"
+                                        disabled={!applyAccountId || isApplying}
+                                    >
+                                        {isApplying ? 'Aplicando...' : 'Confirmar Pago'}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Recurring Section */}
+                {recurringPending.length > 0 && filter !== 'applied' && (
+                    <div className="mb-8">
+                        <div className="flex items-center gap-2 mb-4">
+                            <RefreshCw size={18} className="text-indigo-400 animate-spin-slow" />
+                            <h2 className="text-lg font-bold text-white">Deudas Recurrentes por Aplicar (Mes)</h2>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {recurringPending.map(tx => (
+                                <div
+                                    key={tx.id}
+                                    className="bg-slate-900 border border-slate-800 p-4 rounded-xl hover:border-indigo-500/50 transition-all group"
+                                >
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="p-2 bg-indigo-500/10 rounded-lg">
+                                                <Calendar size={16} className="text-indigo-400" />
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-white truncate max-w-[120px]">{tx.description}</p>
+                                                <p className={`text-xs ${isOverdue(tx.dueDate, tx.status) ? 'text-red-400' : 'text-slate-500'}`}>
+                                                    Vence: {formatDate(tx.dueDate)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => toggleStatus(tx.id)}
+                                            className="p-2 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white rounded-lg transition-all"
+                                            title="Aplicar ahora"
+                                        >
+                                            <Check size={18} />
+                                        </button>
+                                    </div>
+                                    <div className="flex justify-between items-end mt-4">
+                                        <div className="text-xs text-slate-500">
+                                            Sugerido: <span className="text-slate-400">{tx.account.name}</span>
+                                        </div>
+                                        <div className="font-mono text-lg font-bold text-indigo-400">
+                                            {tx.currency} {Math.abs(tx.amount).toLocaleString()}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                <div className="flex items-center gap-2 mb-4">
+                    <FileText size={18} className="text-slate-400" />
+                    <h2 className="text-lg font-bold text-white">Historial de Transacciones</h2>
+                </div>
+
                 {/* Transactions List */}
                 <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-x-auto">
                     <table className="w-full min-w-[800px]">
@@ -592,7 +754,7 @@ export default function TransactionsPage() {
                             </tr>
                         </thead>
                         <tbody>
-                            {filteredTransactions.map(tx => (
+                            {mainHistory.map(tx => (
                                 <tr
                                     key={tx.id}
                                     className={`border-t border-slate-800 hover:bg-slate-800/50 ${isOverdue(tx.dueDate, tx.status) ? 'bg-red-900/10' : ''
@@ -668,7 +830,7 @@ export default function TransactionsPage() {
                         </tbody>
                     </table>
 
-                    {transactions.length === 0 && (
+                    {mainHistory.length === 0 && (
                         <div className="text-center py-12 text-slate-500">
                             <Clock size={48} className="mx-auto mb-4 opacity-50" />
                             <p>No hay transacciones {filter !== 'all' ? filter === 'pending' ? 'pendientes' : 'aplicadas' : ''}</p>

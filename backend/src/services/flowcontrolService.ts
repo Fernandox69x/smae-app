@@ -9,10 +9,10 @@ export class FlowControlService {
      */
     static async processRecurringTransactions(userId: string) {
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59);
 
         const recurringTemplates = await prisma.recurringTransaction.findMany({
-            where: { userId, isActive: true, nextDueDate: { lte: today } }
+            where: { userId, isActive: true, nextDueDate: { lte: endOfMonth } }
         });
 
         if (recurringTemplates.length === 0) return;
@@ -20,8 +20,8 @@ export class FlowControlService {
         for (const template of recurringTemplates) {
             let nextDue = new Date(template.nextDueDate);
 
-            // Generar instancias hasta que el próximo vencimiento sea en el futuro
-            while (nextDue <= today) {
+            // Generar instancias hasta que el próximo vencimiento sea fuera del mes actual
+            while (nextDue <= endOfMonth) {
                 // Crear la instancia de la transacción
                 await prisma.transaction.create({
                     data: {
@@ -297,7 +297,13 @@ export class FlowControlService {
 
         // Revertir balance si estaba aplicada
         if (transaction.status === 'applied' && transaction.accountId) {
-            await this.updateAccountBalance(transaction.accountId, Number(transaction.amount), false);
+            await this.updateAccountBalance(
+                transaction.accountId,
+                Number(transaction.amount),
+                false,
+                transaction.currency,
+                transaction.exchangeRate ? Number(transaction.exchangeRate) : undefined
+            );
         }
 
         await prisma.transaction.delete({
@@ -325,7 +331,13 @@ export class FlowControlService {
         });
 
         if (transaction.accountId) {
-            await this.updateAccountBalance(transaction.accountId, Number(transaction.amount), newStatus === 'applied');
+            await this.updateAccountBalance(
+                transaction.accountId,
+                Number(transaction.amount),
+                newStatus === 'applied',
+                transaction.currency,
+                transaction.exchangeRate ? Number(transaction.exchangeRate) : undefined
+            );
         }
 
         return updated;
@@ -345,7 +357,13 @@ export class FlowControlService {
 
         // Si la transacción ya estaba aplicada, revertimos su impacto antes de actualizar
         if (transaction.status === 'applied' && transaction.accountId) {
-            await this.updateAccountBalance(transaction.accountId, Number(transaction.amount), false);
+            await this.updateAccountBalance(
+                transaction.accountId,
+                Number(transaction.amount),
+                false,
+                transaction.currency,
+                transaction.exchangeRate ? Number(transaction.exchangeRate) : undefined
+            );
         }
 
         // Actualizar transacción
@@ -365,7 +383,13 @@ export class FlowControlService {
 
         // Si el NUEVO estado es aplicado, aplicamos el impacto al balance
         if (updated.status === 'applied' && updated.accountId) {
-            await this.updateAccountBalance(updated.accountId, Number(updated.amount), true);
+            await this.updateAccountBalance(
+                updated.accountId,
+                Number(updated.amount),
+                true,
+                updated.currency,
+                updated.exchangeRate ? Number(updated.exchangeRate) : undefined
+            );
         }
 
         return updated;
@@ -580,23 +604,41 @@ export class FlowControlService {
     /**
      * Helper para actualizar el balance de una cuenta
      */
-    public static async updateAccountBalance(accountId: string, amount: number, apply: boolean = true) {
+    public static async updateAccountBalance(
+        accountId: string,
+        amount: number,
+        apply: boolean = true,
+        transactionCurrency?: string,
+        exchangeRate?: number
+    ) {
         const account = await prisma.financialAccount.findUnique({ where: { id: accountId } });
         if (!account) return;
 
-        const delta = apply ? amount : -amount;
+        // Si la moneda es diferente, aplicar conversión
+        let finalAmount = Number(amount);
+        if (transactionCurrency && transactionCurrency !== account.currency) {
+            if (transactionCurrency === 'USD' && account.currency === 'NIO') {
+                // USD a NIO
+                const rate = exchangeRate || 36.50;
+                finalAmount = Number(amount) * rate;
+            } else if (transactionCurrency === 'NIO' && account.currency === 'USD') {
+                // NIO a USD
+                const rate = exchangeRate || 36.50;
+                finalAmount = Number(amount) / rate;
+            }
+        }
 
-        if (account.type === 'credit' && amount < 0) {
-            // Gasto en tarjeta de crédito afecta usedCredit (en sentido opuesto al delta de balance)
-            // Si delta es negativo (aplicando gasto), incrementamos usedCredit
-            // Si delta es positivo (revirtiendo gasto), decrementamos usedCredit
-            const creditUpdate = apply ? Math.abs(amount) : -Math.abs(amount);
+        const delta = apply ? finalAmount : -finalAmount;
+
+        if (account.type === 'credit' && finalAmount < 0) {
+            // Gasto en tarjeta de crédito afecta usedCredit
+            const creditUpdate = apply ? Math.abs(finalAmount) : -Math.abs(finalAmount);
             await prisma.financialAccount.update({
                 where: { id: accountId },
                 data: { usedCredit: { increment: creditUpdate } }
             });
         } else {
-            // Cuentas normales o ingresos en tarjeta (pagos)
+            // Cuentas normales o ingresos en tarjeta
             await prisma.financialAccount.update({
                 where: { id: accountId },
                 data: { balance: { increment: delta } }
