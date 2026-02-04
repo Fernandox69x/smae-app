@@ -22,21 +22,40 @@ export class FlowControlService {
 
             // Generar instancias hasta que el próximo vencimiento sea fuera del mes actual
             while (nextDue <= endOfMonth) {
-                // Crear la instancia de la transacción
-                await prisma.transaction.create({
-                    data: {
-                        userId: template.userId,
-                        accountId: template.accountId,
-                        categoryId: template.categoryId,
-                        amount: template.amount,
-                        currency: template.currency,
-                        description: template.description,
-                        dueDate: new Date(nextDue),
-                        status: 'pending',
-                        recurringTransactionId: template.id as any,
-                        notes: 'Generado automáticamente (Recurrente)'
-                    } as any
+                // Verificar si ya existe una instancia para esta fecha y plantilla
+                // Usamos un rango de fecha para evitar problemas con la hora exacta
+                const startOfDay = new Date(nextDue);
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(nextDue);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const existingInstance = await prisma.transaction.findFirst({
+                    where: {
+                        recurringTransactionId: template.id,
+                        dueDate: {
+                            gte: startOfDay,
+                            lte: endOfDay
+                        }
+                    }
                 });
+
+                if (!existingInstance) {
+                    // Crear la instancia de la transacción
+                    await prisma.transaction.create({
+                        data: {
+                            userId: template.userId,
+                            accountId: template.accountId,
+                            categoryId: template.categoryId,
+                            amount: template.amount,
+                            currency: template.currency,
+                            description: template.description,
+                            dueDate: new Date(nextDue),
+                            status: 'pending',
+                            recurringTransactionId: template.id as any,
+                            notes: 'Generado automáticamente (Recurrente)'
+                        } as any
+                    });
+                }
 
                 // Calcular la próxima fecha según la frecuencia
                 const currentDue = new Date(nextDue);
@@ -57,7 +76,6 @@ export class FlowControlService {
                         nextDue.setFullYear(currentDue.getFullYear() + 1);
                         break;
                     default:
-                        // Si la frecuencia es desconocida, paramos para evitar bucles infinitos
                         nextDue.setFullYear(currentDue.getFullYear() + 100);
                         break;
                 }
@@ -69,6 +87,30 @@ export class FlowControlService {
                 data: { nextDueDate: nextDue }
             });
         }
+    }
+
+    /**
+     * Elimina una plantilla recurrente y sus instancias pendientes
+     */
+    static async deleteRecurringTransactionTemplate(id: string, userId: string) {
+        const template = await prisma.recurringTransaction.findFirst({
+            where: { id, userId }
+        });
+
+        if (!template) throw new Error('Plantilla no encontrada');
+
+        // 1. Eliminar instancias pendientes asociadas
+        await prisma.transaction.deleteMany({
+            where: {
+                recurringTransactionId: id,
+                status: 'pending'
+            }
+        });
+
+        // 2. Eliminar la plantilla
+        await prisma.recurringTransaction.delete({
+            where: { id }
+        });
     }
 
     /**

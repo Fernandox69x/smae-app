@@ -221,6 +221,10 @@ router.get('/loans/calculation/amortization', (req: Request, res: Response) => {
 router.get('/transactions', async (req: Request, res: Response) => {
     try {
         const userId = getUserId(req);
+
+        // Asegurar transacciones recurrentes generadas
+        await FlowControlService.processRecurringTransactions(userId);
+
         const { status, startDate, endDate, accountId, categoryId } = req.query;
 
         const where: any = { userId };
@@ -420,6 +424,9 @@ router.post('/recurring-transactions', async (req: Request, res: Response) => {
             }
         });
 
+        // Procesar inmediatamente para generar instancias iniciales
+        await FlowControlService.processRecurringTransactions(userId);
+
         res.status(201).json(template);
     } catch (error) {
         console.error('Error creating recurring template:', error);
@@ -449,6 +456,9 @@ router.put('/recurring-transactions/:id', async (req: Request, res: Response) =>
             }
         });
 
+        // Reprocesar por si cambió la fecha o frecuencia
+        await FlowControlService.processRecurringTransactions(userId);
+
         res.json(template);
     } catch (error) {
         console.error('Error updating recurring template:', error);
@@ -462,20 +472,11 @@ router.delete('/recurring-transactions/:id', async (req: Request, res: Response)
         const { id } = req.params;
         const userId = getUserId(req);
 
-        const existing = await (prisma as any).recurringTransaction.findFirst({
-            where: { id: String(id), userId }
-        });
-
-        if (!existing) return res.status(404).json({ error: 'Plantilla no encontrada' });
-
-        await (prisma as any).recurringTransaction.delete({
-            where: { id: String(id) }
-        });
-
+        await FlowControlService.deleteRecurringTransactionTemplate(String(id), userId);
         res.json({ success: true });
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error deleting recurring template:', error);
-        res.status(500).json({ error: 'Error al eliminar plantilla recurrente' });
+        res.status(error.message === 'Plantilla no encontrada' ? 404 : 500).json({ error: error.message || 'Error al eliminar plantilla recurrente' });
     }
 });
 
