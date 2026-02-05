@@ -9,7 +9,7 @@ interface SkillSidebarProps {
 }
 
 /**
- * Sidebar Unificado con Trazabilidad SMAE
+ * Sidebar Unificado con Trazabilidad devMastery
  */
 export function SkillSidebar({ onLevelUpClick, onEditClick, onClose }: SkillSidebarProps) {
     const { selectedSkill, refreshSkills, deleteSkill, toggleActivate } = useSelectedSkill();

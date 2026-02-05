@@ -97,7 +97,7 @@ export default function FlowControlDashboard() {
 
     const handleLogout = () => {
         localStorage.removeItem('token');
-        navigate('/login');
+        navigate('/');
     };
 
     const fetchData = async () => {
@@ -185,7 +185,7 @@ export default function FlowControlDashboard() {
                             <Wallet className="text-indigo-500" size={24} />
                         </div>
                         <div>
-                            <h1 className="text-xl font-bold text-white leading-tight">FlowControl</h1>
+                            <h1 className="text-xl font-bold text-white leading-tight">devFinance</h1>
                             <p className="text-slate-500 text-xs">Gestión de Efectivo</p>
                         </div>
                     </div>
@@ -193,7 +193,7 @@ export default function FlowControlDashboard() {
                     <div className="flex flex-wrap items-center gap-2">
                         {/* Return to Portfolio */}
                         <Link
-                            to="/portfolio"
+                            to="/"
                             className="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
                         >
                             <Briefcase size={14} />

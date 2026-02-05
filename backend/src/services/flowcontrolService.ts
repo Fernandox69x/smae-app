@@ -456,6 +456,14 @@ export class FlowControlService {
             );
         }
 
+        // Determinar appliedAt
+        let appliedAt = transaction.appliedAt;
+        if (status === 'applied' && transaction.status !== 'applied') {
+            appliedAt = new Date();
+        } else if (status === 'pending') {
+            appliedAt = null;
+        }
+
         // Actualizar transacción
         const updated = await prisma.transaction.update({
             where: { id },
@@ -467,7 +475,7 @@ export class FlowControlService {
                 description: description !== undefined ? description : undefined,
                 categoryId: categoryId !== undefined ? categoryId : undefined,
                 notes: notes !== undefined ? notes : undefined,
-                appliedAt: status === 'applied' ? (transaction.appliedAt || new Date()) : (status === 'pending' ? null : undefined)
+                appliedAt
             }
         });
 
@@ -732,17 +740,27 @@ export class FlowControlService {
             }
         }
 
-        const delta = apply ? finalAmount : -finalAmount;
+        if (account.type === 'credit') {
+            // Lógica de Tarjeta de Crédito:
+            // Un monto negativo (gasto) aumenta el usedCredit.
+            // Un monto positivo (pago/abono) disminuye el usedCredit.
+            // El balance de la cuenta de crédito usualmente es 0 o positivo si tiene saldo a favor,
+            // pero el usedCredit es el que trackeamos principalmente.
 
-        if (account.type === 'credit' && finalAmount < 0) {
-            // Gasto en tarjeta de crédito afecta usedCredit
-            const creditUpdate = apply ? Math.abs(finalAmount) : -Math.abs(finalAmount);
+            // Si apply=true, sumamos el impacto. Si apply=false (revertir), restamos el impacto.
+            // Para gastos (finalAmount < 0): usedCredit aumenta en abs(finalAmount)
+            // Para pagos (finalAmount > 0): usedCredit disminuye en finalAmount
+
+            // Simplificamos: usedCredit += (-finalAmount) * (apply ? 1 : -1)
+            const creditDelta = (-finalAmount) * (apply ? 1 : -1);
+
             await prisma.financialAccount.update({
                 where: { id: accountId },
-                data: { usedCredit: { increment: creditUpdate } }
+                data: { usedCredit: { increment: creditDelta } }
             });
         } else {
-            // Cuentas normales o ingresos en tarjeta
+            // Cuentas normales (Efectivo, Débito)
+            const delta = apply ? finalAmount : -finalAmount;
             await prisma.financialAccount.update({
                 where: { id: accountId },
                 data: { balance: { increment: delta } }

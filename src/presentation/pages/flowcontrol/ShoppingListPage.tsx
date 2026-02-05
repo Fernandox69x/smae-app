@@ -4,20 +4,18 @@ import {
     ShoppingBag,
     Plus,
     Search,
-    Filter,
-    ChevronRight,
-    AlertCircle,
-    Package,
-    TrendingUp,
-    Home,
     Trash2,
     CheckCircle2,
-    History,
     Store,
-    ArrowLeft,
     Loader2,
     Edit2,
-    X
+    X,
+    Minus,
+    ShoppingCart,
+    Utensils,
+    AlertCircle,
+    ChevronRight,
+    Package
 } from 'lucide-react';
 import { config } from '../../../config';
 import { CalculatorInput } from '../../components/flowcontrol/CalculatorInput';
@@ -28,6 +26,7 @@ interface PurchaseHistory {
     currency: string;
     store: string;
     purchaseDate: string;
+    quantity: number | null;
 }
 
 interface ShoppingItem {
@@ -35,6 +34,10 @@ interface ShoppingItem {
     name: string;
     category: string | null;
     isInStock: boolean;
+    currentStock: number;
+    minStock: number;
+    maxStock: number | null;
+    isPerishable: boolean;
     priority: 'low' | 'medium' | 'high';
     targetQuantity: number | null;
     unit: string | null;
@@ -42,15 +45,25 @@ interface ShoppingItem {
     history: PurchaseHistory[];
 }
 
+interface CartItem {
+    item: ShoppingItem;
+    quantity: number;
+    price: number;
+    notes?: string;
+}
+
 export default function ShoppingListPage() {
     const [items, setItems] = useState<ShoppingItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('');
-    const [activeTab, setActiveTab] = useState<'shopping' | 'pantry'>('shopping');
+    const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
 
     // Modal states
     const [showForm, setShowForm] = useState(false);
     const [showPurchaseModal, setShowPurchaseModal] = useState<ShoppingItem | null>(null);
+    const [showHistoryModal, setShowHistoryModal] = useState<ShoppingItem | null>(null);
+    const [fullHistory, setFullHistory] = useState<PurchaseHistory[]>([]);
+    const [loadingHistory, setLoadingHistory] = useState(false);
     const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
 
     // Form state for new/edit item
@@ -60,7 +73,11 @@ export default function ShoppingListPage() {
         priority: 'medium',
         targetQuantity: '',
         unit: '',
-        notes: ''
+        notes: '',
+        currentStock: '0',
+        minStock: '0',
+        maxStock: '',
+        isPerishable: false
     });
 
     // Form state for recording purchase
@@ -68,9 +85,15 @@ export default function ShoppingListPage() {
         price: '',
         currency: 'NIO',
         store: '',
-        quantity: '',
+        quantity: '1',
         notes: ''
     });
+
+    // Cart / Ticket states
+    const [cart, setCart] = useState<CartItem[]>([]);
+    const [showCartModal, setShowCartModal] = useState(false);
+    const [cartStore, setCartStore] = useState('');
+    const [cartNotes, setCartNotes] = useState('');
 
     const token = localStorage.getItem('token');
 
@@ -110,37 +133,24 @@ export default function ShoppingListPage() {
                 },
                 body: JSON.stringify({
                     ...formData,
-                    targetQuantity: formData.targetQuantity ? Number(formData.targetQuantity) : null
+                    targetQuantity: formData.targetQuantity ? Number(formData.targetQuantity) : null,
+                    currentStock: Number(formData.currentStock),
+                    minStock: Number(formData.minStock),
+                    maxStock: formData.maxStock ? Number(formData.maxStock) : null
                 })
             });
 
             if (res.ok) {
                 setShowForm(false);
                 setEditingItem(null);
-                setFormData({ name: '', category: '', priority: 'medium', targetQuantity: '', unit: '', notes: '' });
+                setFormData({
+                    name: '', category: '', priority: 'medium', targetQuantity: '', unit: '', notes: '',
+                    currentStock: '0', minStock: '0', maxStock: '', isPerishable: false
+                });
                 fetchItems();
             }
         } catch (error) {
             console.error('Error saving shopping item:', error);
-        }
-    };
-
-    const handleToggleStock = async (item: ShoppingItem) => {
-        try {
-            const res = await fetch(`${config.API_URL}/shopping/items/${item.id}`, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ isInStock: !item.isInStock })
-            });
-
-            if (res.ok) {
-                fetchItems();
-            }
-        } catch (error) {
-            console.error('Error toggling stock:', error);
         }
     };
 
@@ -175,13 +185,13 @@ export default function ShoppingListPage() {
                     itemId: showPurchaseModal.id,
                     ...purchaseData,
                     price: Number(purchaseData.price),
-                    quantity: purchaseData.quantity ? Number(purchaseData.quantity) : null
+                    quantity: Number(purchaseData.quantity)
                 })
             });
 
             if (res.ok) {
                 setShowPurchaseModal(null);
-                setPurchaseData({ price: '', currency: 'NIO', store: '', quantity: '', notes: '' });
+                setPurchaseData({ price: '', currency: 'NIO', store: '', quantity: '1', notes: '' });
                 fetchItems();
             }
         } catch (error) {
@@ -189,12 +199,113 @@ export default function ShoppingListPage() {
         }
     };
 
+    const handleConsume = async (itemId: string, quantity: number) => {
+        try {
+            const res = await fetch(`${config.API_URL}/shopping/consume`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ itemId, quantity })
+            });
+
+            if (res.ok) {
+                fetchItems();
+            }
+        } catch (error) {
+            console.error('Error consuming item:', error);
+        }
+    };
+
+    const addToCart = (item: ShoppingItem) => {
+        if (cart.find(i => i.item.id === item.id)) return;
+        setCart([...cart, { item, quantity: 1, price: 0 }]);
+    };
+
+    const removeFromCart = (id: string) => {
+        setCart(cart.filter(i => i.item.id !== id));
+    };
+
+    const updateCartItem = (id: string, updates: Partial<CartItem>) => {
+        setCart(cart.map(i => i.item.id === id ? { ...i, ...updates } : i));
+    };
+
+    const handleCheckout = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!cartStore || cart.length === 0) return;
+
+        try {
+            const res = await fetch(`${config.API_URL}/shopping/tickets`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    store: cartStore,
+                    notes: cartNotes,
+                    items: cart.map(i => ({
+                        itemId: i.item.id,
+                        price: i.price,
+                        quantity: i.quantity,
+                        notes: i.notes
+                    }))
+                })
+            });
+
+            if (res.ok) {
+                setCart([]);
+                setCartStore('');
+                setCartNotes('');
+                setShowCartModal(false);
+                fetchItems();
+            }
+        } catch (error) {
+            console.error('Error in checkout:', error);
+        }
+    };
+
+    const fetchHistory = async (itemId: string) => {
+        setLoadingHistory(true);
+        try {
+            const res = await fetch(`${config.API_URL}/shopping/items/${itemId}/history`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setFullHistory(data);
+            }
+        } catch (error) {
+            console.error('Error fetching history:', error);
+        } finally {
+            setLoadingHistory(false);
+        }
+    };
+
+    const handleDeleteHistory = async (historyId: string, revertStock: boolean) => {
+        if (!confirm(`¿Seguro que quieres eliminar este registro? ${revertStock ? '(Se restará del stock actual)' : ''}`)) return;
+        try {
+            const res = await fetch(`${config.API_URL}/shopping/history/${historyId}?revertStock=${revertStock}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (res.ok) {
+                if (showHistoryModal) fetchHistory(showHistoryModal.id);
+                fetchItems();
+            }
+        } catch (error) {
+            console.error('Error deleting history entry:', error);
+        }
+    };
+
     const filteredItems = items.filter(item => {
         const matchesSearch = item.name.toLowerCase().includes(filter.toLowerCase()) ||
             (item.category?.toLowerCase().includes(filter.toLowerCase()));
 
-        if (activeTab === 'shopping') {
-            return matchesSearch && !item.isInStock;
+        if (showOnlyLowStock) {
+            return matchesSearch && item.currentStock <= item.minStock;
         }
         return matchesSearch;
     });
@@ -223,40 +334,54 @@ export default function ShoppingListPage() {
                         </h1>
                     </div>
 
-                    <button
-                        onClick={() => {
-                            setEditingItem(null);
-                            setFormData({ name: '', category: '', priority: 'medium', targetQuantity: '', unit: '', notes: '' });
-                            setShowForm(true);
-                        }}
-                        className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/20"
-                    >
-                        <Plus size={20} />
-                        Nuevo Producto
-                    </button>
+                    <div className="flex gap-4">
+                        {cart.length > 0 && (
+                            <button
+                                onClick={() => setShowCartModal(true)}
+                                className="flex items-center justify-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/20"
+                            >
+                                <ShoppingCart size={20} />
+                                Lista de Compra ({cart.length})
+                            </button>
+                        )}
+                        <button
+                            onClick={() => {
+                                setEditingItem(null);
+                                setFormData({
+                                    name: '', category: '', priority: 'medium', targetQuantity: '', unit: '', notes: '',
+                                    currentStock: '0', minStock: '0', maxStock: '', isPerishable: false
+                                });
+                                setShowForm(true);
+                            }}
+                            className="flex items-center justify-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/20"
+                        >
+                            <Plus size={20} />
+                            Nuevo Producto
+                        </button>
+                    </div>
                 </div>
 
-                {/* Tabs & Search */}
+                {/* Filter & Search */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                    <div className="lg:col-span-2 flex bg-slate-900/50 p-1 rounded-xl border border-slate-800">
+                    <div className="lg:col-span-2 flex items-center gap-4 bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
                         <button
-                            onClick={() => setActiveTab('shopping')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${activeTab === 'shopping' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
-                        >
-                            <ShoppingBag size={18} />
-                            Lista de Compras
-                            {items.filter(i => !i.isInStock).length > 0 && (
-                                <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full ml-1">
-                                    {items.filter(i => !i.isInStock).length}
-                                </span>
-                            )}
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('pantry')}
-                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-bold transition-all ${activeTab === 'pantry' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'}`}
+                            onClick={() => setShowOnlyLowStock(false)}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${!showOnlyLowStock ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20' : 'text-slate-400 hover:text-slate-200'}`}
                         >
                             <Package size={18} />
-                            Inventario / Despensa
+                            Inventario Completo
+                        </button>
+                        <button
+                            onClick={() => setShowOnlyLowStock(true)}
+                            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition-all ${showOnlyLowStock ? 'bg-red-600 text-white shadow-lg shadow-red-600/20' : 'text-slate-400 hover:text-slate-200'}`}
+                        >
+                            <ShoppingBag size={18} />
+                            Por Comprar / Stock Bajo
+                            {items.filter(i => i.currentStock <= i.minStock).length > 0 && (
+                                <span className="bg-white text-red-600 text-[10px] px-1.5 py-0.5 rounded-full ml-1 font-black">
+                                    {items.filter(i => i.currentStock <= i.minStock).length}
+                                </span>
+                            )}
                         </button>
                     </div>
 
@@ -264,10 +389,10 @@ export default function ShoppingListPage() {
                         <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                         <input
                             type="text"
-                            placeholder="Buscar producto o categoría..."
+                            placeholder="Buscar producto..."
                             value={filter}
                             onChange={(e) => setFilter(e.target.value)}
-                            className="w-full bg-slate-900 border border-slate-800 rounded-xl p-3 pl-12 text-slate-200 focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                            className="w-full bg-slate-900 border border-slate-800 rounded-2xl p-4 pl-12 text-slate-200 focus:ring-2 focus:ring-indigo-500 outline-none transition-all placeholder:text-slate-600 shadow-inner"
                         />
                     </div>
                 </div>
@@ -306,7 +431,11 @@ export default function ShoppingListPage() {
                                                     priority: item.priority,
                                                     targetQuantity: item.targetQuantity?.toString() || '',
                                                     unit: item.unit || '',
-                                                    notes: item.notes || ''
+                                                    notes: item.notes || '',
+                                                    currentStock: item.currentStock.toString(),
+                                                    minStock: item.minStock.toString(),
+                                                    maxStock: item.maxStock?.toString() || '',
+                                                    isPerishable: item.isPerishable
                                                 });
                                                 setShowForm(true);
                                             }}
@@ -323,29 +452,47 @@ export default function ShoppingListPage() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-4 mb-6">
-                                    <div className="flex-1 bg-slate-950 p-3 rounded-xl border border-slate-800">
-                                        <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Estado</p>
-                                        <div className="flex items-center gap-2">
-                                            {item.isInStock ? (
-                                                <>
-                                                    <CheckCircle2 size={16} className="text-emerald-500" />
-                                                    <span className="text-sm font-medium text-emerald-400">En Despensa</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <AlertCircle size={16} className="text-red-400" />
-                                                    <span className="text-sm font-medium text-red-400">Agotado</span>
-                                                </>
-                                            )}
+                                <div className="space-y-4 mb-6">
+                                    {/* Stock Progress Bar */}
+                                    <div className="space-y-1">
+                                        <div className="flex justify-between items-end">
+                                            <span className="text-[10px] text-slate-500 uppercase font-black">Stock Actual</span>
+                                            <span className={`text-xs font-bold ${item.currentStock <= item.minStock ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                {item.currentStock} / {item.maxStock || item.targetQuantity || '∞'} {item.unit}
+                                            </span>
+                                        </div>
+                                        <div className="h-2 bg-slate-950 rounded-full overflow-hidden border border-slate-800">
+                                            <div
+                                                className={`h-full transition-all duration-500 ${item.currentStock <= item.minStock ? 'bg-red-500' : 'bg-emerald-500'}`}
+                                                style={{ width: `${Math.min(100, (item.currentStock / (Number(item.maxStock) || Number(item.targetQuantity) || 10)) * 100)}%` }}
+                                            />
                                         </div>
                                     </div>
-                                    {item.targetQuantity && (
-                                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
-                                            <p className="text-[10px] text-slate-500 uppercase font-bold mb-1">Stock Ideal</p>
-                                            <p className="text-sm font-bold text-white">
-                                                {item.targetQuantity} <span className="text-slate-500 font-normal">{item.unit}</span>
-                                            </p>
+
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                                            <p className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Mínimo</p>
+                                            <p className="text-xs font-bold text-white">{item.minStock} {item.unit}</p>
+                                        </div>
+                                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800">
+                                            <p className="text-[9px] text-slate-500 uppercase font-bold mb-0.5">Estado</p>
+                                            <div className="flex items-center gap-1.5">
+                                                {item.currentStock <= item.minStock ? (
+                                                    <AlertCircle size={12} className="text-red-400" />
+                                                ) : (
+                                                    <CheckCircle2 size={12} className="text-emerald-500" />
+                                                )}
+                                                <span className={`text-[10px] font-bold ${item.currentStock <= item.minStock ? 'text-red-400' : 'text-emerald-400'}`}>
+                                                    {item.currentStock <= item.minStock ? 'Reabastecer' : 'Stock OK'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {item.isPerishable && (
+                                        <div className="flex items-center gap-2 p-2 bg-amber-500/5 border border-amber-500/20 rounded-lg">
+                                            <Utensils size={12} className="text-amber-500" />
+                                            <span className="text-[10px] text-amber-200/70 font-bold uppercase italic">Producto Perecedero</span>
                                         </div>
                                     )}
                                 </div>
@@ -355,37 +502,71 @@ export default function ShoppingListPage() {
                                     <div className="mb-6 space-y-2">
                                         <div className="flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase">
                                             <span>Última Compra</span>
-                                            <span className="flex items-center gap-1"><Store size={10} /> {item.history[0].store}</span>
+                                            <button
+                                                onClick={() => {
+                                                    setShowHistoryModal(item);
+                                                    fetchHistory(item.id);
+                                                }}
+                                                className="flex items-center gap-1 text-indigo-400 hover:text-indigo-300 transition-colors"
+                                            >
+                                                Ver Historial <ChevronRight size={10} />
+                                            </button>
                                         </div>
-                                        <div className="flex justify-between items-center p-2 bg-slate-950/50 rounded-lg border border-slate-800/50">
-                                            <span className="text-emerald-400 font-bold text-sm">
-                                                {item.history[0].currency} {Number(item.history[0].price).toLocaleString()}
-                                            </span>
-                                            <span className="text-xs text-slate-500">
-                                                {new Date(item.history[0].purchaseDate).toLocaleDateString()}
-                                            </span>
+                                        <div className="p-3 bg-slate-950/50 rounded-xl border border-slate-800/50 space-y-2">
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="text-slate-400 italic">
+                                                    {item.history[0].quantity || 1} {item.unit} x {item.history[0].currency} {Number(item.history[0].price).toLocaleString()}
+                                                </span>
+                                                <span className="text-slate-500 text-[10px]">
+                                                    {new Date(item.history[0].purchaseDate).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between items-end">
+                                                <span className="text-[10px] text-slate-500 uppercase font-bold">Total</span>
+                                                <span className="text-emerald-400 font-black text-base">
+                                                    {item.history[0].currency} {(Number(item.history[0].price) * Number(item.history[0].quantity || 1)).toLocaleString()}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
-
                                 <div className="flex gap-2">
-                                    {!item.isInStock ? (
+                                    <div className="flex bg-slate-950 rounded-xl border border-slate-800 p-1 flex-1">
+                                        <button
+                                            onClick={() => handleConsume(item.id, 1)}
+                                            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                                        >
+                                            <Minus size={16} />
+                                        </button>
+                                        <div className="flex-1 flex items-center justify-center font-bold text-sm">
+                                            {item.currentStock}
+                                        </div>
                                         <button
                                             onClick={() => {
                                                 setShowPurchaseModal(item);
+                                                setPurchaseData({ ...purchaseData, quantity: '1' });
                                             }}
-                                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-emerald-600/20"
+                                            className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-emerald-400 transition-colors"
                                         >
-                                            <CheckCircle2 size={18} />
-                                            Registrar Compra
+                                            <Plus size={16} />
+                                        </button>
+                                    </div>
+
+                                    {!cart.find(i => i.item.id === item.id) ? (
+                                        <button
+                                            onClick={() => addToCart(item)}
+                                            className="px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-lg shadow-indigo-600/20"
+                                            title="Agregar a lista de compras"
+                                        >
+                                            <ShoppingCart size={18} />
                                         </button>
                                     ) : (
                                         <button
-                                            onClick={() => handleToggleStock(item)}
-                                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl transition-all"
+                                            onClick={() => removeFromCart(item.id)}
+                                            className="px-4 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all"
+                                            title="Quitar de la lista"
                                         >
                                             <X size={18} />
-                                            Se Agotó
                                         </button>
                                     )}
                                 </div>
@@ -399,13 +580,15 @@ export default function ShoppingListPage() {
             {showForm && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
                     <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl">
-                        <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-white">
+                        <div className="p-6 bg-indigo-600 flex justify-between items-center text-white">
+                            <h2 className="text-xl font-bold">
                                 {editingItem ? 'Editar Producto' : 'Nuevo Producto'}
                             </h2>
-                            <button onClick={() => setShowForm(false)} className="text-slate-500 hover:text-white"><X size={24} /></button>
+                            <button onClick={() => setShowForm(false)} className="text-indigo-100 hover:text-white transition-colors">
+                                <X size={24} />
+                            </button>
                         </div>
-                        <form onSubmit={handleSaveItem} className="p-6 space-y-4">
+                        <form onSubmit={handleSaveItem} className="p-6 space-y-4 bg-slate-900 overflow-y-auto max-h-[calc(90vh-80px)] custom-scrollbar">
                             <div>
                                 <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Nombre del Producto</label>
                                 <input
@@ -413,7 +596,7 @@ export default function ShoppingListPage() {
                                     type="text"
                                     value={formData.name}
                                     onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
+                                    className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-white"
                                     placeholder="Ej: Leche, Jabón de platos..."
                                 />
                             </div>
@@ -441,6 +624,38 @@ export default function ShoppingListPage() {
                                     </select>
                                 </div>
                             </div>
+
+                            <div className="grid grid-cols-3 gap-4">
+                                <div>
+                                    <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Stock Actual</label>
+                                    <input
+                                        type="number"
+                                        value={formData.currentStock}
+                                        onChange={e => setFormData({ ...formData, currentStock: e.target.value })}
+                                        className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Stock Mín.</label>
+                                    <input
+                                        type="number"
+                                        value={formData.minStock}
+                                        onChange={e => setFormData({ ...formData, minStock: e.target.value })}
+                                        className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Stock Máx.</label>
+                                    <input
+                                        type="number"
+                                        value={formData.maxStock}
+                                        onChange={e => setFormData({ ...formData, maxStock: e.target.value })}
+                                        className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
+                                        placeholder="Opcional"
+                                    />
+                                </div>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Cantidad Ideal</label>
@@ -448,7 +663,7 @@ export default function ShoppingListPage() {
                                         type="number"
                                         value={formData.targetQuantity}
                                         onChange={e => setFormData({ ...formData, targetQuantity: e.target.value })}
-                                        className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
+                                        className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-white"
                                         placeholder="Ej: 2"
                                     />
                                 </div>
@@ -458,23 +673,37 @@ export default function ShoppingListPage() {
                                         type="text"
                                         value={formData.unit}
                                         onChange={e => setFormData({ ...formData, unit: e.target.value })}
-                                        className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
+                                        className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-white"
                                         placeholder="litros, kg, c/u..."
                                     />
                                 </div>
                             </div>
+
+                            <div className="flex items-center gap-2 p-3 bg-slate-800 rounded-xl border border-slate-700">
+                                <input
+                                    type="checkbox"
+                                    id="isPerishable"
+                                    checked={formData.isPerishable}
+                                    onChange={e => setFormData({ ...formData, isPerishable: e.target.checked })}
+                                    className="w-4 h-4 rounded text-indigo-500 focus:ring-indigo-500 bg-slate-900 border-slate-700"
+                                />
+                                <label htmlFor="isPerishable" className="text-sm font-bold text-slate-300 cursor-pointer">
+                                    ¿Es un producto perecedero?
+                                </label>
+                            </div>
+
                             <div>
                                 <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Notas</label>
                                 <textarea
                                     value={formData.notes}
                                     onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                    className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white h-24 resize-none"
+                                    className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-white h-20 resize-none"
                                     placeholder="Marca preferida, detalles..."
                                 />
                             </div>
                             <button
                                 type="submit"
-                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-emerald-600/30"
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-600/30"
                             >
                                 {editingItem ? 'Actualizar Producto' : 'Guardar Producto'}
                             </button>
@@ -483,23 +712,25 @@ export default function ShoppingListPage() {
                 </div>
             )}
 
-            {/* Purchase Modal */}
+            {/* Quick Purchase Modal (Single Item) */}
             {showPurchaseModal && (
                 <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl">
-                        <div className="p-6 bg-emerald-600 flex justify-between items-center text-white">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="p-6 bg-indigo-600 flex justify-between items-center text-white shrink-0">
                             <div>
-                                <h2 className="text-xl font-bold">Registrar Compra</h2>
-                                <p className="text-emerald-100 text-sm uppercase font-bold">{showPurchaseModal.name}</p>
+                                <h2 className="text-xl font-bold font-montserrat">Registrar Compra Rápida</h2>
+                                <p className="text-indigo-100 text-sm uppercase font-bold">{showPurchaseModal.name}</p>
                             </div>
-                            <button onClick={() => setShowPurchaseModal(null)} className="text-emerald-100 hover:text-white"><X size={24} /></button>
+                            <button onClick={() => setShowPurchaseModal(null)} className="text-indigo-100 hover:text-white transition-colors">
+                                <X size={24} />
+                            </button>
                         </div>
-                        <form onSubmit={handleRecordPurchase} className="p-6 space-y-4">
+                        <form onSubmit={handleRecordPurchase} className="p-6 space-y-4 bg-slate-900 overflow-y-auto custom-scrollbar">
                             <div>
-                                <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Precio Pagado</label>
+                                <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Precio Pagado (Unitario)</label>
                                 <CalculatorInput
                                     value={purchaseData.price}
-                                    onChange={val => setPurchaseData({ ...purchaseData, price: val })}
+                                    onChange={val => setPurchaseData({ ...purchaseData, price: val.toString() })}
                                     placeholder="0.00"
                                 />
                             </div>
@@ -528,37 +759,223 @@ export default function ShoppingListPage() {
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Cantidad comprada (opcional)</label>
+                                <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Cantidad comprada</label>
                                 <input
                                     type="number"
                                     value={purchaseData.quantity}
                                     onChange={e => setPurchaseData({ ...purchaseData, quantity: e.target.value })}
-                                    className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-emerald-500 outline-none text-white"
-                                    placeholder={showPurchaseModal.unit ? `Ej: ${showPurchaseModal.targetQuantity || '1'}` : '1'}
+                                    className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-white"
                                 />
                             </div>
-
-                            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800">
-                                <h4 className="text-[10px] text-slate-500 uppercase font-bold mb-2">Historial Sugerido</h4>
-                                {showPurchaseModal.history.length > 0 ? (
-                                    <div className="flex justify-between items-center">
-                                        <span className="text-sm text-slate-400">Última vez:</span>
-                                        <span className="text-emerald-400 font-bold">
-                                            {showPurchaseModal.history[0].currency} {Number(showPurchaseModal.history[0].price).toLocaleString()}
-                                        </span>
-                                    </div>
-                                ) : (
-                                    <p className="text-xs text-slate-600">Primer registro para este producto</p>
-                                )}
-                            </div>
-
                             <button
                                 type="submit"
-                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-emerald-600/30"
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-600/30"
                             >
                                 Confirmar Compra
                             </button>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Cart / Ticket Modal */}
+            {showCartModal && (
+                <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+                        <div className="p-6 bg-indigo-600 flex justify-between items-center text-white shrink-0">
+                            <div className="flex items-center gap-3">
+                                <ShoppingCart size={24} />
+                                <div>
+                                    <h2 className="text-xl font-bold">Completar Compra Agrupada</h2>
+                                    <p className="text-indigo-100 text-sm">Estas registrando un "ticket" o salida de compras</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowCartModal(false)} className="text-indigo-100 hover:text-white"><X size={24} /></button>
+                        </div>
+
+                        <form onSubmit={handleCheckout} className="flex-1 overflow-hidden flex flex-col">
+                            <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6 border-b border-slate-800 shrink-0">
+                                <div>
+                                    <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Comercio / Tienda</label>
+                                    <div className="relative">
+                                        <Store className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                                        <input
+                                            required
+                                            type="text"
+                                            value={cartStore}
+                                            onChange={e => setCartStore(e.target.value)}
+                                            className="w-full bg-slate-800 border-0 rounded-xl p-3 pl-10 focus:ring-2 focus:ring-indigo-500 outline-none text-white"
+                                            placeholder="Ej: Walmart, La Colonia..."
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-slate-500 uppercase font-bold mb-1 block">Notas del Ticket</label>
+                                    <input
+                                        type="text"
+                                        value={cartNotes}
+                                        onChange={e => setCartNotes(e.target.value)}
+                                        className="w-full bg-slate-800 border-0 rounded-xl p-3 focus:ring-2 focus:ring-indigo-500 outline-none text-white"
+                                        placeholder="Ej: Compras del mes, Súper semanal..."
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                                <div className="min-w-[500px]">
+                                    <table className="w-full">
+                                        <thead className="text-left border-b border-slate-800 text-[10px] uppercase font-black text-slate-500">
+                                            <tr>
+                                                <th className="pb-4">Producto</th>
+                                                <th className="pb-4">Cantidad</th>
+                                                <th className="pb-4">Precio Unit.</th>
+                                                <th className="pb-4 text-right">Total</th>
+                                                <th className="pb-4"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="text-sm">
+                                            {cart.map((item) => (
+                                                <tr key={item.item.id} className="border-b border-slate-800/50 group">
+                                                    <td className="py-4">
+                                                        <div className="font-bold text-white uppercase">{item.item.name}</div>
+                                                        <div className="text-[10px] text-slate-500">{item.item.category}</div>
+                                                    </td>
+                                                    <td className="py-4">
+                                                        <input
+                                                            type="number"
+                                                            value={item.quantity}
+                                                            onChange={e => updateCartItem(item.item.id, { quantity: Number(e.target.value) })}
+                                                            className="w-20 bg-slate-800 border-0 rounded-lg p-2 focus:ring-2 focus:ring-indigo-500 outline-none text-white text-center"
+                                                        />
+                                                    </td>
+                                                    <td className="py-4">
+                                                        <div className="relative">
+                                                            <span className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 text-xs">C$</span>
+                                                            <input
+                                                                type="number"
+                                                                value={item.price}
+                                                                onChange={e => updateCartItem(item.item.id, { price: Number(e.target.value) })}
+                                                                className="w-24 bg-slate-800 border-0 rounded-lg p-2 pl-7 focus:ring-2 focus:ring-indigo-500 outline-none text-white"
+                                                            />
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 text-right font-bold text-indigo-400">
+                                                        C$ {(item.price * item.quantity).toLocaleString()}
+                                                    </td>
+                                                    <td className="py-4 text-right">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeFromCart(item.item.id)}
+                                                            className="p-2 text-slate-500 hover:text-red-400 transition-colors"
+                                                        >
+                                                            <X size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="p-6 bg-slate-900 border-t border-slate-800 shrink-0 flex items-center justify-between">
+                                <div className="flex flex-col">
+                                    <span className="text-[10px] text-slate-500 uppercase font-bold">Total del Ticket</span>
+                                    <span className="text-2xl font-black text-white">
+                                        C$ {cart.reduce((acc, i) => acc + (i.price * i.quantity), 0).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="flex gap-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowCartModal(false)}
+                                        className="px-6 py-3 text-slate-400 font-bold hover:text-white transition-colors"
+                                    >
+                                        Cancelar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-600/30"
+                                    >
+                                        Finalizar Compra
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            {/* History Modal */}
+            {showHistoryModal && (
+                <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                    <div className="bg-slate-900 border border-slate-800 w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+                        <div className="p-6 bg-indigo-600 flex justify-between items-center text-white shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-white/20 rounded-xl">
+                                    <ShoppingBag size={24} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold">Historial de Precios</h2>
+                                    <p className="text-indigo-100 text-sm font-bold uppercase">{showHistoryModal.name}</p>
+                                </div>
+                            </div>
+                            <button onClick={() => setShowHistoryModal(null)} className="text-indigo-100 hover:text-white transition-colors">
+                                <X size={24} />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar bg-slate-900">
+                            {loadingHistory ? (
+                                <div className="flex flex-col items-center justify-center py-20">
+                                    <Loader2 size={40} className="text-indigo-500 animate-spin mb-4" />
+                                    <p className="text-slate-400 font-bold">Cargando historial...</p>
+                                </div>
+                            ) : fullHistory.length === 0 ? (
+                                <div className="text-center py-20 text-slate-500 italic">
+                                    No hay registros de compras anteriores.
+                                </div>
+                            ) : (
+                                <div className="space-y-4">
+                                    {fullHistory.map((entry) => (
+                                        <div key={entry.id} className="group bg-slate-950/50 border border-slate-800 rounded-2xl p-4 transition-all hover:border-slate-700">
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <Store size={14} className="text-slate-500" />
+                                                        <span className="text-sm font-bold text-white">{entry.store}</span>
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-500 uppercase font-black">
+                                                        {new Date(entry.purchaseDate).toLocaleDateString(undefined, {
+                                                            weekday: 'long',
+                                                            year: 'numeric',
+                                                            month: 'long',
+                                                            day: 'numeric'
+                                                        })}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => handleDeleteHistory(entry.id, true)}
+                                                        className="p-2 text-slate-600 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                                                        title="Eliminar y revertir stock"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-between items-end border-t border-slate-800 pt-3">
+                                                <div className="text-xs text-slate-400 italic">
+                                                    {entry.quantity || 1} {showHistoryModal.unit} x {entry.currency} {Number(entry.price).toLocaleString()}
+                                                </div>
+                                                <div className="text-indigo-400 font-black text-lg">
+                                                    {entry.currency} {(Number(entry.price) * Number(entry.quantity || 1)).toLocaleString()}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
             )}

@@ -84,11 +84,11 @@ function DashboardContent() {
                     className="flex items-center gap-2 cursor-pointer group"
                     onClick={() => navigate('/')}
                 >
-                    <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-slate-900 font-black text-xl group-hover:scale-110 transition-transform">
-                        S
+                    <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center text-slate-900 font-black text-xl group-hover:scale-110 transition-transform">
+                        M
                     </div>
                     <h1 className="text-xl font-black text-white tracking-tighter">
-                        SMAE<span className="text-emerald-500">.</span>
+                        devMastery<span className="text-indigo-500">.</span>
                     </h1>
                 </div>
 
@@ -110,7 +110,10 @@ function DashboardContent() {
 
                     {/* Logout */}
                     <button
-                        onClick={logout}
+                        onClick={() => {
+                            logout();
+                            navigate('/');
+                        }}
                         className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"
                         title="Cerrar sesión"
                     >

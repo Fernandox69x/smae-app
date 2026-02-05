@@ -34,6 +34,7 @@ model User {
   loans                  Loan[]
   recurringTransactions  RecurringTransaction[]
   shoppingItems          ShoppingItem[]
+  shoppingTickets        ShoppingTicket[]
 
   @@map("users")
 }
@@ -466,8 +467,13 @@ model ShoppingItem {
   name        String   @db.VarChar(100)
   category    String?  @db.VarChar(50)     // "Lácteos", "Limpieza", etc.
   
-  isInStock   Boolean  @default(true) @map("is_in_stock")
-  priority    String   @default("medium") @db.VarChar(20) // "low", "medium", "high"
+  isInStock      Boolean  @default(true) @map("is_in_stock")
+  currentStock   Decimal  @default(0) @map("current_stock") @db.Decimal(10,2)
+  minStock       Decimal  @default(0) @map("min_stock") @db.Decimal(10,2)
+  maxStock       Decimal? @map("max_stock") @db.Decimal(10,2)
+  isPerishable   Boolean  @default(false) @map("is_perishable")
+  
+  priority       String   @default("medium") @db.VarChar(20) // "low", "medium", "high"
   
   targetQuantity Decimal? @map("target_quantity") @db.Decimal(10,2)
   unit           String?  @db.VarChar(20)     // "litros", "kg", "unidades"
@@ -496,8 +502,29 @@ model PurchaseHistory {
   quantity       Decimal? @db.Decimal(10,2)
   notes          String?  @db.Text
   
+  ticketId       String?  @map("shopping_ticket_id")
+  ticket         ShoppingTicket? @relation(fields: [ticketId], references: [id], onDelete: SetNull)
+  
   item ShoppingItem @relation(fields: [shoppingItemId], references: [id], onDelete: Cascade)
   
   @@map("flow_purchase_history")
+}
+
+/// Agrupación de compras por comercio / ticket
+model ShoppingTicket {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  store        String   @db.VarChar(100)
+  totalAmount  Decimal  @default(0) @map("total_amount") @db.Decimal(12,2)
+  currency     String   @default("NIO") @db.VarChar(3)
+  purchaseDate DateTime @default(now()) @map("purchase_date")
+  notes        String?  @db.Text
+  
+  items        PurchaseHistory[]
+  user         User     @relation(fields: [userId], references: [id])
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("flow_shopping_tickets")
 }
 

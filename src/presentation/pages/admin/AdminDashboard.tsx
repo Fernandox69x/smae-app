@@ -179,7 +179,7 @@ export function AdminDashboard() {
                             </div>
                             <div>
                                 <p className="text-3xl font-bold">{stats?.skills.total || 0}</p>
-                                <p className="text-sm text-slate-500">Skills en SMAE</p>
+                                <p className="text-sm text-slate-500">Skills en devMastery</p>
                             </div>
                         </div>
                     </div>

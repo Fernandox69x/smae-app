@@ -8,7 +8,7 @@ import {
     ArrowRight,
     LayoutDashboard,
     CheckCircle2,
-    Target
+    Code2
 } from 'lucide-react';
 
 export function LandingPage() {
@@ -19,19 +19,19 @@ export function LandingPage() {
             {/* Navbar */}
             <nav className="px-4 py-4 sm:px-6 sm:py-6 flex justify-between items-center max-w-7xl mx-auto">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-950/20">
-                        <Target className="text-slate-900" size={20} />
+                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-950/20">
+                        <Code2 className="text-slate-900" size={20} />
                     </div>
-                    <span className="text-xl sm:text-2xl font-black bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                        S.M.A.E.
+                    <span className="text-xl sm:text-2xl font-black bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">
+                        devMastery
                     </span>
                 </div>
 
                 <div className="flex items-center gap-2 sm:gap-4">
                     {isAuthenticated ? (
                         <Link
-                            to="/smae/dashboard"
-                            className="flex items-center gap-2 px-3 py-2 sm:px-5 sm:py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs sm:text-base font-bold transition-all shadow-lg shadow-emerald-900/20"
+                            to="/mastery/dashboard"
+                            className="flex items-center gap-2 px-3 py-2 sm:px-5 sm:py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs sm:text-base font-bold transition-all shadow-lg shadow-indigo-900/20"
                         >
                             <LayoutDashboard size={16} />
                             <span className="hidden xs:inline">Dashboard</span>
@@ -39,11 +39,11 @@ export function LandingPage() {
                         </Link>
                     ) : (
                         <>
-                            <Link to="/smae/login" className="text-slate-400 hover:text-white text-xs sm:text-sm font-medium px-2 sm:px-4">
+                            <Link to="/login" className="text-slate-400 hover:text-white text-xs sm:text-sm font-medium px-2 sm:px-4">
                                 Login
                             </Link>
                             <Link
-                                to="/smae/login"
+                                to="/login"
                                 className="px-3 py-2 sm:px-5 sm:py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-xs sm:text-base font-bold transition-all border border-slate-700"
                             >
                                 Empezar
@@ -55,24 +55,24 @@ export function LandingPage() {
 
             {/* Hero Section */}
             <main className="max-w-7xl mx-auto px-6 pt-12 sm:pt-20 pb-20 sm:pb-32 flex flex-col items-center text-center">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-400 text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-6 sm:mb-8 animate-bounce">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/10 border border-indigo-500/20 rounded-full text-indigo-400 text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-6 sm:mb-8 animate-bounce">
                     <Zap size={12} fill="currentColor" />
                     v2.0 con IA Mentor
                 </div>
 
                 <h1 className="text-4xl sm:text-5xl md:text-7xl font-black mb-6 leading-tight max-w-4xl">
                     Domina habilidades <br className="hidden sm:block" />
-                    <span className="text-emerald-400">Sin Autoengaño</span>
+                    <span className="text-indigo-400">Sin Autoengaño</span>
                 </h1>
 
                 <p className="text-base sm:text-lg md:text-xl text-slate-400 max-w-2xl mb-8 sm:mb-12 leading-relaxed">
-                    SMAE es el Sistema de Maestría diseñado para destruir el autoengaño mediante evidencias obligatorias e IA Mentor.
+                    devMastery es el Sistema de Maestría diseñado para destruir el autoengaño mediante evidencias obligatorias e IA Mentor.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-4 mb-12 sm:mb-20 w-full max-w-xs sm:max-w-md">
                     <Link
-                        to="/smae/login"
-                        className="flex-1 px-6 py-3 sm:px-8 sm:py-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-extrabold text-base sm:text-lg flex items-center justify-center gap-2 transition-all transform hover:scale-105 shadow-xl shadow-emerald-900/40"
+                        to="/login"
+                        className="flex-1 px-6 py-3 sm:px-8 sm:py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-extrabold text-base sm:text-lg flex items-center justify-center gap-2 transition-all transform hover:scale-105 shadow-xl shadow-indigo-900/40"
                     >
                         Comenzar mi Grafo
                         <ArrowRight size={18} />
@@ -102,7 +102,7 @@ export function LandingPage() {
                             </div>
                             <h3 className="text-lg sm:text-xl font-bold mb-4">Anti-Autoengaño</h3>
                             <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-                                No puedes subir de nivel solo haciendo clic. Debes proporcionar evidencia textual verificable.
+                                En devMastery no puedes subir de nivel solo haciendo clic. Debes proporcionar evidencia textual verificable.
                             </p>
                         </div>
 
@@ -172,7 +172,7 @@ export function LandingPage() {
 
             {/* Footer */}
             <footer className="py-8 sm:py-12 border-t border-slate-800 text-center text-slate-600 text-[10px] sm:text-sm">
-                <p>&copy; 2026 S.M.A.E. v2.0 - Sistema Maestro Anti-Autoengaño</p>
+                <p>&copy; 2026 dev ecosystem - devMastery v2.0</p>
             </footer>
         </div>
     );

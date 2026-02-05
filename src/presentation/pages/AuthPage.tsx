@@ -44,10 +44,10 @@ export function AuthPage({ onSuccess }: AuthPageProps) {
             <div className="w-full max-w-md">
                 {/* Logo */}
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                        S.M.A.E.
+                    <h1 className="text-3xl font-black bg-gradient-to-r from-indigo-400 via-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                        dev ecosystem
                     </h1>
-                    <p className="text-slate-400 mt-2">Sistema de Maestría y Aprendizaje Efectivo</p>
+                    <p className="text-slate-400 mt-2 font-medium">Un solo inicio de sesión para todo tu mundo dev</p>
                 </div>
 
                 {/* Card */}

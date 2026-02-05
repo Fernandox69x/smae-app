@@ -745,8 +745,15 @@ export default function TransactionsPage() {
                                         <div className="text-xs text-slate-500">
                                             Sugerido: <span className="text-slate-400">{tx.account.name}</span>
                                         </div>
-                                        <div className="font-mono text-lg font-bold text-indigo-400">
-                                            {tx.currency} {Math.abs(tx.amount).toLocaleString()}
+                                        <div className="text-right">
+                                            <DualCurrency
+                                                amount={Number(tx.amount)}
+                                                currency={tx.currency}
+                                                exchangeRate={tx.exchangeRate || exchangeRate}
+                                                displayCurrency={displayCurrency}
+                                                size="sm"
+                                                className={Number(tx.amount) > 0 ? 'text-emerald-400' : 'text-rose-400 font-bold'}
+                                            />
                                         </div>
                                     </div>
                                 </div>
@@ -858,6 +865,6 @@ export default function TransactionsPage() {
                     )}
                 </div>
             </div>
-        </div >
+        </div>
     );
 }

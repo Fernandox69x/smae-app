@@ -60,7 +60,8 @@ export default function RecurringTransactionsPage() {
         startDate: new Date().toISOString().split('T')[0],
         nextDueDate: new Date().toISOString().split('T')[0],
         accountId: '',
-        categoryId: ''
+        categoryId: '',
+        isIncome: false
     });
 
     const fetchData = async () => {
@@ -93,6 +94,8 @@ export default function RecurringTransactionsPage() {
                 ? `${config.API_URL}/flowcontrol/recurring-transactions/${editingId}`
                 : `${config.API_URL}/flowcontrol/recurring-transactions`;
 
+            const finalAmount = form.isIncome ? Math.abs(Number(form.amount)) : -Math.abs(Number(form.amount));
+
             const res = await fetch(url, {
                 method: editingId ? 'PUT' : 'POST',
                 headers: {
@@ -101,7 +104,7 @@ export default function RecurringTransactionsPage() {
                 },
                 body: JSON.stringify({
                     ...form,
-                    amount: parseFloat(form.amount.toString()),
+                    amount: finalAmount,
                     categoryId: form.categoryId || null
                 })
             });
@@ -117,7 +120,8 @@ export default function RecurringTransactionsPage() {
                     startDate: new Date().toISOString().split('T')[0],
                     nextDueDate: new Date().toISOString().split('T')[0],
                     accountId: '',
-                    categoryId: ''
+                    categoryId: '',
+                    isIncome: false
                 });
                 fetchData();
             }
@@ -149,7 +153,8 @@ export default function RecurringTransactionsPage() {
             startDate: t.startDate.split('T')[0],
             nextDueDate: t.nextDueDate.split('T')[0],
             accountId: t.accountId,
-            categoryId: t.categoryId || ''
+            categoryId: t.categoryId || '',
+            isIncome: t.amount > 0
         });
         setShowForm(true);
     };
@@ -194,7 +199,8 @@ export default function RecurringTransactionsPage() {
                                 startDate: new Date().toISOString().split('T')[0],
                                 nextDueDate: new Date().toISOString().split('T')[0],
                                 accountId: accounts[0]?.id || '',
-                                categoryId: ''
+                                categoryId: '',
+                                isIncome: false
                             });
                             setShowForm(true);
                         }}
@@ -272,9 +278,26 @@ export default function RecurringTransactionsPage() {
                         <div className="bg-slate-900 w-full max-w-md rounded-2xl border border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
                             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
                                 <h2 className="text-xl font-bold">{editingId ? 'Editar Suscripción' : 'Nueva Suscripción'}</h2>
-                                <button onClick={() => setShowForm(false)} className="text-slate-500 hover:text-white"><Plus className="rotate-45" /></button>
+                                <button type="button" onClick={() => setShowForm(false)} className="text-slate-500 hover:text-white"><Plus className="rotate-45" /></button>
                             </div>
                             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                                {/* Type Toggle */}
+                                <div className="flex gap-2 mb-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm({ ...form, isIncome: false })}
+                                        className={`flex-1 p-3 rounded-lg flex items-center justify-center gap-2 transition-colors border ${!form.isIncome ? 'bg-rose-600 border-rose-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}
+                                    >
+                                        Gasto
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm({ ...form, isIncome: true })}
+                                        className={`flex-1 p-3 rounded-lg flex items-center justify-center gap-2 transition-colors border ${form.isIncome ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-slate-800 border-slate-700 text-slate-400'}`}
+                                    >
+                                        Ingreso
+                                    </button>
+                                </div>
                                 <div>
                                     <label className="block text-sm text-slate-400 mb-1">Descripción</label>
                                     <input
@@ -297,7 +320,6 @@ export default function RecurringTransactionsPage() {
                                             onChange={e => setForm({ ...form, amount: parseFloat(e.target.value) })}
                                             className="w-full p-3 bg-slate-800 border border-slate-700 rounded-lg focus:border-indigo-500 outline-none"
                                         />
-                                        <p className="text-[10px] text-slate-500 mt-1">Usa negativo (-) para gastos</p>
                                     </div>
                                     <div>
                                         <label className="block text-sm text-slate-400 mb-1">Moneda</label>
