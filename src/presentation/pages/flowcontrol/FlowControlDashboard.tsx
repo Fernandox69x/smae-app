@@ -8,7 +8,6 @@ import {
     Plus,
     DollarSign,
     CreditCard,
-    Banknote,
     Calendar,
     Clock,
     ArrowRight,
@@ -17,10 +16,11 @@ import {
     Tag,
     PiggyBank,
     Repeat,
-    Calculator,
-    ShoppingBag
+    ShoppingBag,
+    LogOut,
+    Briefcase
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, PieChart, Pie, Cell, Legend } from 'recharts';
+import { useNavigate } from 'react-router-dom';
 import { config } from '../../../config';
 import DualCurrency from '../../components/DualCurrency/DualCurrency';
 import FinancialAdvisor from '../../components/flowcontrol/FinancialAdvisor';
@@ -81,14 +81,24 @@ interface Notification {
 export default function FlowControlDashboard() {
     const [summary, setSummary] = useState<Summary | null>(null);
     const [notifications, setNotifications] = useState<Notification | null>(null);
-    const [chartData, setChartData] = useState<{ date: string; balance: number }[]>([]);
+    const [chartData, setChartData] = useState<{
+        date: string;
+        balance: number;
+        milestones?: { description: string, amount: number, currency: string, type: string }[]
+    }[]>([]);
     const [loading, setLoading] = useState(true);
     const [displayCurrency, setDisplayCurrency] = useState<'NIO' | 'USD'>('NIO');
     const [exchangeRate, setExchangeRate] = useState(36.50);
     const [showSettings, setShowSettings] = useState(false);
     const [tempRate, setTempRate] = useState('36.50');
 
+    const navigate = useNavigate();
     const token = localStorage.getItem('token');
+
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        navigate('/login');
+    };
 
     const fetchData = async () => {
         try {
@@ -97,10 +107,14 @@ export default function FlowControlDashboard() {
                 'Content-Type': 'application/json'
             };
 
+            const today = new Date();
+            const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+            const daysRemaining = lastDayOfMonth - today.getDate();
+
             const [summaryRes, notifRes, chartRes] = await Promise.all([
                 fetch(`${config.API_URL}/flowcontrol/summary`, { headers }),
                 fetch(`${config.API_URL}/flowcontrol/notifications`, { headers }),
-                fetch(`${config.API_URL}/flowcontrol/chart?days=30`, { headers })
+                fetch(`${config.API_URL}/flowcontrol/chart?days=${daysRemaining}`, { headers })
             ]);
 
             if (summaryRes.ok) {
@@ -164,51 +178,131 @@ export default function FlowControlDashboard() {
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 md:p-8">
             <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header */}
-                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-                            <Wallet className="text-indigo-500" /> FlowControl
-                        </h1>
-                        <p className="text-slate-400 text-sm">Gestión de Flujo de Efectivo</p>
+                {/* Header - Version 2 (Consolidated) */}
+                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900/40 p-4 rounded-2xl border border-slate-800/60">
+                    <div className="flex items-center gap-4">
+                        <div className="p-3 bg-indigo-500/10 rounded-xl">
+                            <Wallet className="text-indigo-500" size={24} />
+                        </div>
+                        <div>
+                            <h1 className="text-xl font-bold text-white leading-tight">FlowControl</h1>
+                            <p className="text-slate-500 text-xs">Gestión de Efectivo</p>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        {/* Settings */}
-                        <button
-                            onClick={() => setShowSettings(!showSettings)}
-                            className="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors"
-                            title="Configurar tipo de cambio"
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* Return to Portfolio */}
+                        <Link
+                            to="/portfolio"
+                            className="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider"
                         >
-                            <Settings size={18} className="text-slate-400" />
+                            <Briefcase size={14} />
+                            <span>Portafolio</span>
+                        </Link>
+
+                        {/* Logout */}
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 bg-rose-900/10 border border-rose-500/10 rounded-lg hover:bg-rose-900/20 transition-colors flex items-center gap-2 text-[10px] font-bold text-rose-500 uppercase tracking-wider"
+                        >
+                            <LogOut size={14} />
+                            <span>Salir</span>
                         </button>
 
-                        <div className="flex gap-3">
-                            <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-right">
-                                <span className="text-xs text-slate-500 uppercase block">Saldo Real</span>
+                        <div className="w-px h-6 bg-slate-800 mx-1"></div>
+
+                        {/* Top Balances Block */}
+                        <div className="flex gap-2">
+                            <div className="bg-slate-950/50 px-3 py-1.5 rounded-xl border border-slate-800/50 text-right min-w-[100px]">
+                                <span className="text-[9px] text-slate-500 uppercase block font-bold">Saldo</span>
                                 <DualCurrency
                                     amount={summary?.realBalance || 0}
                                     currency="NIO"
                                     exchangeRate={exchangeRate}
                                     displayCurrency={displayCurrency}
-                                    size="md"
-                                    className={(summary?.realBalance || 0) < 0 ? 'text-red-400' : 'text-emerald-400'}
+                                    size="sm"
+                                    className={(summary?.realBalance || 0) < 0 ? 'text-red-400' : 'text-emerald-400 font-bold'}
                                 />
                             </div>
-                            <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-right">
-                                <span className="text-xs text-slate-500 uppercase block">Proyección</span>
+                            <div className="bg-slate-950/50 px-3 py-1.5 rounded-xl border border-slate-800/50 text-right min-w-[100px]">
+                                <span className="text-[9px] text-slate-500 uppercase block font-bold">Proyectado</span>
                                 <DualCurrency
                                     amount={summary?.projectedBalance || 0}
                                     currency="NIO"
                                     exchangeRate={exchangeRate}
                                     displayCurrency={displayCurrency}
-                                    size="md"
-                                    className={(summary?.projectedBalance || 0) < 0 ? 'text-red-500' : 'text-indigo-400'}
+                                    size="sm"
+                                    className={(summary?.projectedBalance || 0) < 0 ? 'text-red-500' : 'text-indigo-400 font-bold'}
                                 />
                             </div>
                         </div>
+
+                        <button
+                            onClick={() => setShowSettings(!showSettings)}
+                            className="p-2 bg-slate-800 rounded-lg hover:bg-slate-700 transition-colors ml-1"
+                        >
+                            <Settings size={16} className="text-slate-500" />
+                        </button>
                     </div>
                 </header>
+
+                {/* Stats Ribbon - Version 2 (Mosaic Horizontal) */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
+                        <div className="p-2 bg-emerald-500/10 rounded-lg shrink-0">
+                            <TrendingUp size={16} className="text-emerald-500" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[10px] text-slate-500 uppercase block font-bold truncate">Ingresos</span>
+                            <span className="text-sm font-bold text-white block truncate">C$ {summary?.incomeThisMonth.toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
+                        <div className="p-2 bg-rose-500/10 rounded-lg shrink-0">
+                            <TrendingDown size={16} className="text-rose-500" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[10px] text-slate-500 uppercase block font-bold truncate">Gastos</span>
+                            <span className="text-sm font-bold text-white block truncate">C$ {summary?.expenseThisMonth.toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
+                        <div className="p-2 bg-amber-500/10 rounded-lg shrink-0">
+                            <ArrowRight size={16} className="text-amber-500" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[10px] text-slate-500 uppercase block font-bold truncate">Cobros</span>
+                            <span className="text-sm font-bold text-white block truncate">C$ {summary?.totalReceivable.toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
+                        <div className="p-2 bg-red-500/10 rounded-lg shrink-0">
+                            <TrendingDown size={16} className="text-red-500" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[10px] text-slate-500 uppercase block font-bold truncate">Pagos</span>
+                            <span className="text-sm font-bold text-white block truncate">C$ {summary?.totalPayable.toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
+                        <div className="p-2 bg-indigo-500/10 rounded-lg shrink-0">
+                            <Clock size={16} className="text-indigo-500" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[10px] text-slate-500 uppercase block font-bold truncate">Préstamos</span>
+                            <span className="text-sm font-bold text-white block truncate">C$ {summary?.monthlyLoanCommitment.toLocaleString()}</span>
+                        </div>
+                    </div>
+                    <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800/50 flex items-center gap-3">
+                        <div className="p-2 bg-amber-500/10 rounded-lg shrink-0">
+                            <PiggyBank size={16} className="text-amber-500" />
+                        </div>
+                        <div className="min-w-0">
+                            <span className="text-[10px] text-slate-500 uppercase block font-bold truncate">Deuda Total</span>
+                            <span className="text-sm font-bold text-white block truncate">C$ {summary?.totalLoanDebt.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Settings Panel */}
                 {showSettings && (
@@ -291,417 +385,229 @@ export default function FlowControlDashboard() {
                         ) : null}
                     </div>
                 ) : null}
+            </div>
 
-                {/* AI Advisor */}
-                <div className="mb-6">
-                    <FinancialAdvisor />
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Chart Column */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Chart */}
-                        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
-                            <div className="flex justify-between items-center mb-4">
-                                <h3 className="font-bold text-white flex items-center gap-2">
-                                    <TrendingUp size={18} /> Proyección 30 Días
-                                </h3>
-                            </div>
-                            <div className="h-64 w-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={chartData}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                                        <XAxis
-                                            dataKey="date"
-                                            stroke="#94a3b8"
-                                            tickFormatter={(str) => new Date(str).getDate().toString()}
-                                        />
-                                        <YAxis stroke="#94a3b8" />
-                                        <Tooltip
-                                            contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}
-                                            formatter={(value: any) => [`C$ ${value?.toLocaleString()}`, 'Saldo']}
-                                        />
-                                        <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="balance"
-                                            stroke="#6366f1"
-                                            strokeWidth={3}
-                                            dot={{ fill: '#6366f1', r: 4 }}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                            <p className="text-xs text-slate-500 mt-2 text-center">
-                                Línea roja = C$ 0. Si la gráfica baja, te quedas sin efectivo.
-                            </p>
-                        </div>
-
-                        {/* Quick Stats */}
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                                <div className="flex items-center gap-2 text-emerald-400 mb-2">
-                                    <TrendingUp size={18} />
-                                    <span className="text-xs uppercase">Ingresos</span>
+            <div className="max-w-7xl mx-auto space-y-10 mt-8">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                    {/* Main Area (Projection) - 8 cols */}
+                    <div className="lg:col-span-8 space-y-6">
+                        <div className="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-xl">
+                            <div className="flex justify-between items-center mb-6">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className="p-2 bg-indigo-500/10 rounded-lg shrink-0">
+                                        <TrendingUp size={18} className="text-indigo-400" />
+                                    </div>
+                                    <h3 className="font-bold text-white leading-tight">Proyección del Flujo Mensual</h3>
                                 </div>
-                                <DualCurrency
-                                    amount={summary?.incomeThisMonth || 0}
-                                    currency="NIO"
-                                    exchangeRate={exchangeRate}
-                                    displayCurrency="NIO"
-                                    size="md"
-                                    className="text-white"
-                                />
-                                <span className="text-xs text-slate-500">Este mes</span>
                             </div>
+                            <div className="h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+                                {chartData.filter(d => d.milestones && d.milestones.length > 0).length > 0 ? (
+                                    <div className="space-y-2">
+                                        {chartData.filter(d => d.milestones && d.milestones.length > 0).map((day, idx) => (
+                                            <div key={idx} className="relative pl-6 pb-6 border-l border-slate-800 last:pb-0">
+                                                {/* Dot */}
+                                                <div className="absolute left-[-5px] top-1.5 w-2.5 h-2.5 rounded-full bg-indigo-500 border-2 border-slate-900 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
 
-                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                                <div className="flex items-center gap-2 text-rose-400 mb-2">
-                                    <TrendingDown size={18} />
-                                    <span className="text-xs uppercase">Gastos</span>
-                                </div>
-                                <DualCurrency
-                                    amount={summary?.expenseThisMonth || 0}
-                                    currency="NIO"
-                                    exchangeRate={exchangeRate}
-                                    displayCurrency="NIO"
-                                    size="md"
-                                    className="text-white"
-                                />
-                                <span className="text-xs text-slate-500">Este mes</span>
-                            </div>
+                                                <div className="flex flex-col gap-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest bg-slate-800/50 px-2 py-0.5 rounded border border-slate-700/50">
+                                                                {new Date(day.date).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-400 font-bold italic">
+                                                                {new Date(day.date).toLocaleDateString('es-ES', { weekday: 'long' })}
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] text-slate-500 uppercase font-black tracking-tighter">Saldo Est.</span>
+                                                            <span className="text-sm font-black text-indigo-400">C$ {day.balance.toLocaleString()}</span>
+                                                        </div>
+                                                    </div>
 
-                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                                <div className="flex items-center gap-2 text-amber-400 mb-2">
-                                    <ArrowRight size={18} />
-                                    <span className="text-xs uppercase">Me Deben</span>
-                                </div>
-                                <DualCurrency
-                                    amount={summary?.totalReceivable || 0}
-                                    currency="NIO"
-                                    exchangeRate={exchangeRate}
-                                    displayCurrency="NIO"
-                                    size="md"
-                                    className="text-white"
-                                />
-                            </div>
-
-                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800">
-                                <div className="flex items-center gap-2 text-red-400 mb-2">
-                                    <TrendingDown size={18} />
-                                    <span className="text-xs uppercase">Debo</span>
-                                </div>
-                                <DualCurrency
-                                    amount={summary?.totalPayable || 0}
-                                    currency="NIO"
-                                    exchangeRate={exchangeRate}
-                                    displayCurrency="NIO"
-                                    size="md"
-                                    className="text-white"
-                                />
-                            </div>
-
-                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 border-l-4 border-l-amber-500/50">
-                                <div className="flex items-center gap-2 text-amber-500 mb-2">
-                                    <PiggyBank size={18} />
-                                    <span className="text-xs uppercase">Deuda Préstamos</span>
-                                </div>
-                                <DualCurrency
-                                    amount={summary?.totalLoanDebt || 0}
-                                    currency="NIO"
-                                    exchangeRate={exchangeRate}
-                                    displayCurrency="NIO"
-                                    size="md"
-                                    className="text-white"
-                                />
-                                <span className="text-xs text-slate-500">Total saldo</span>
-                            </div>
-
-                            <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 border-l-4 border-l-indigo-500/50">
-                                <div className="flex items-center gap-2 text-indigo-400 mb-2">
-                                    <Clock size={18} />
-                                    <span className="text-xs uppercase">Cuotas Préstamos</span>
-                                </div>
-                                <DualCurrency
-                                    amount={summary?.monthlyLoanCommitment || 0}
-                                    currency="NIO"
-                                    exchangeRate={exchangeRate}
-                                    displayCurrency="NIO"
-                                    size="md"
-                                    className="text-white"
-                                />
-                                <span className="text-xs text-slate-500">Total mensual</span>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                        {day.milestones?.map((m, mIdx) => (
+                                                            <div key={mIdx} className="flex items-center justify-between bg-slate-950/40 p-3 rounded-xl border border-slate-800/30 hover:border-slate-700 transition-colors group">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className={`p-1.5 rounded-lg ${m.type === 'income' ? 'bg-emerald-500/10 text-emerald-400' :
+                                                                        m.type === 'loan' ? 'bg-rose-500/10 text-rose-400' : 'bg-amber-500/10 text-amber-400'
+                                                                        }`}>
+                                                                        {m.type === 'income' ? <TrendingUp size={12} /> :
+                                                                            m.type === 'loan' ? <PiggyBank size={12} /> : <TrendingDown size={12} />}
+                                                                    </div>
+                                                                    <div className="flex flex-col min-w-0">
+                                                                        <span className="text-[11px] font-bold text-slate-300 break-words line-clamp-2">{m.description}</span>
+                                                                        <span className="text-[8px] text-slate-500 uppercase font-black">
+                                                                            {m.type === 'income' ? 'Ingreso' : m.type === 'loan' ? 'Préstamo' : 'Gasto'}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                                <span className={`text-[11px] font-black ${m.amount >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                    {m.amount >= 0 ? '+' : ''}{m.amount.toLocaleString()} <span className="text-[8px] opacity-60 ml-0.5">{m.currency}</span>
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center text-slate-600 space-y-3">
+                                        <Calendar size={40} className="opacity-10" />
+                                        <p className="text-xs font-bold uppercase tracking-widest">No hay movimientos proyectados</p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    {/* Sidebar */}
-                    <div className="space-y-6">
+                    {/* Sidebar Area - 4 cols */}
+                    <div className="lg:col-span-4 space-y-8">
+                        {/* AI Advisor - Sidebar Placement */}
+                        <FinancialAdvisor />
+
                         {/* Quick Actions */}
-                        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
-                            <h3 className="font-bold text-white mb-4">Acciones Rápidas</h3>
-                            <div className="space-y-2">
-                                <Link
-                                    to="/flowcontrol/dashboard"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    <Wallet size={18} className="text-indigo-400" />
-                                    <span>Dashboard</span>
+                        <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Herramientas</h3>
+                            <div className="grid grid-cols-4 gap-3">
+                                <Link to="/flowcontrol/transactions" className="flex flex-col items-center gap-1 group" title="Nueva Transacción">
+                                    <div className="p-3 bg-slate-800 rounded-xl group-hover:bg-emerald-500/20 group-hover:text-emerald-400 transition-all">
+                                        <Plus size={20} />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">Trans.</span>
                                 </Link>
-                                <Link
-                                    to="/flowcontrol/transactions"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    <Plus size={18} className="text-emerald-400" />
-                                    <span>Nueva Transacción</span>
+                                <Link to="/flowcontrol/shopping" className="flex flex-col items-center gap-1 group" title="Lista de Compras">
+                                    <div className="p-3 bg-slate-800 rounded-xl group-hover:bg-amber-500/20 group-hover:text-amber-400 transition-all">
+                                        <ShoppingBag size={20} />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">Compras</span>
                                 </Link>
-                                <Link
-                                    to="/flowcontrol/shopping"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    <ShoppingBag size={18} className="text-amber-400" />
-                                    <span>Lista de Compras</span>
+                                <Link to="/flowcontrol/recurring" className="flex flex-col items-center gap-1 group" title="Gastos Recurrentes">
+                                    <div className="p-3 bg-slate-800 rounded-xl group-hover:bg-indigo-500/20 group-hover:text-indigo-400 transition-all">
+                                        <Repeat size={20} />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">Recur.</span>
                                 </Link>
-                                <Link
-                                    to="/flowcontrol/recurring"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors border-l-2 border-l-amber-500/50"
-                                >
-                                    <Repeat size={18} className="text-amber-400" />
-                                    <span>Gastos Recurrentes</span>
+                                <Link to="/flowcontrol/accounts" className="flex flex-col items-center gap-1 group" title="Cuentas">
+                                    <div className="p-3 bg-slate-800 rounded-xl group-hover:bg-sky-500/20 group-hover:text-sky-400 transition-all">
+                                        <CreditCard size={20} />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">Cuentas</span>
                                 </Link>
-                                <Link
-                                    to="/flowcontrol/simulator"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    <Calculator size={18} className="text-blue-400" />
-                                    <span>Simulador</span>
+                                <Link to="/flowcontrol/receivables" className="flex flex-col items-center gap-1 group" title="Cuentas por Cobrar">
+                                    <div className="p-3 bg-slate-800 rounded-xl group-hover:bg-amber-500/20 group-hover:text-amber-400 transition-all">
+                                        <DollarSign size={20} />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">Cobros</span>
                                 </Link>
-                                <Link
-                                    to="/flowcontrol/accounts"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    <CreditCard size={18} className="text-indigo-400" />
-                                    <span>Cuentas</span>
+                                <Link to="/flowcontrol/categories" className="flex flex-col items-center gap-1 group" title="Categorías">
+                                    <div className="p-3 bg-slate-800 rounded-xl group-hover:bg-indigo-500/20 group-hover:text-indigo-400 transition-all">
+                                        <Tag size={20} />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">Cat.</span>
                                 </Link>
-                                <Link
-                                    to="/flowcontrol/receivables"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    <DollarSign size={18} className="text-amber-400" />
-                                    <span>Cuentas por Cobrar</span>
-                                </Link>
-                                <Link
-                                    to="/flowcontrol/categories"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    <Tag size={18} className="text-indigo-400" />
-                                    <span>Categorías</span>
-                                </Link>
-                                <Link
-                                    to="/flowcontrol/loans"
-                                    className="flex items-center gap-3 p-3 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
-                                >
-                                    <PiggyBank size={18} className="text-amber-400" />
-                                    <span>Préstamos</span>
+                                <Link to="/flowcontrol/loans" className="flex flex-col items-center gap-1 group" title="Préstamos">
+                                    <div className="p-3 bg-slate-800 rounded-xl group-hover:bg-rose-500/20 group-hover:text-rose-400 transition-all">
+                                        <PiggyBank size={20} />
+                                    </div>
+                                    <span className="text-[9px] text-slate-400 font-bold uppercase">Préstamos</span>
                                 </Link>
                             </div>
                         </div>
 
-                        {/* Categorización de Gastos */}
-                        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
-                            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                                <Tag size={18} className="text-indigo-400" /> Distribución de Gastos
-                            </h3>
-                            <div className="h-64 w-full">
-                                {summary?.categoryDistribution && summary.categoryDistribution.length > 0 ? (
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={summary.categoryDistribution}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {summary.categoryDistribution.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip
-                                                contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', fontSize: '12px' }}
-                                                formatter={(value: any) => [`C$ ${value.toLocaleString()}`, 'Gastado']}
-                                            />
-                                            <Legend verticalAlign="bottom" height={36} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-slate-500 text-sm">
-                                        <Tag size={32} className="mb-2 opacity-20" />
-                                        <p>No hay gastos registrados este mes</p>
-                                    </div>
-                                )}
+                    </div>
+                </div>
+
+                {/* Bottom Row - Mosaic (Now full width row) */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-12">
+                    {/* Accounts Mosaic - 7 cols */}
+                    <div className="lg:col-span-7 bg-slate-900/40 p-6 rounded-2xl border border-slate-800 shadow-sm">
+                        <div className="flex justify-between items-center mb-6">
+                            <div className="flex items-center gap-2">
+                                <div className="p-1.5 bg-indigo-500/10 rounded-lg">
+                                    <Wallet size={16} className="text-indigo-400" />
+                                </div>
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Estado de Cuentas</h3>
                             </div>
+                            <Link to="/flowcontrol/accounts" className="text-[10px] font-bold text-indigo-400 hover:text-indigo-300">Ver todas</Link>
                         </div>
-
-                        {/* Accounts */}
-                        <div className="bg-slate-900 p-6 rounded-xl border border-slate-800">
-                            <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                                <Wallet size={18} /> Mis Cuentas
-                            </h3>
-                            <div className="space-y-3">
-                                {summary?.accounts?.map(acc => (
-                                    <div
-                                        key={acc.id}
-                                        className="p-3 bg-slate-800 rounded-lg border-l-4"
-                                        style={{ borderLeftColor: acc.color }}
-                                    >
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <div className="font-semibold text-white flex items-center gap-2">
-                                                    {acc.type === 'credit' ? (
-                                                        <CreditCard size={14} />
-                                                    ) : acc.type === 'cash' ? (
-                                                        <Banknote size={14} />
-                                                    ) : (
-                                                        <Wallet size={14} />
-                                                    )}
-                                                    {acc.name}
-                                                </div>
-                                                <div className="text-xs text-slate-500">
-                                                    {acc.bank && `${acc.bank} • `}{acc.currency}
-                                                </div>
-                                            </div>
-                                            <div className="text-right">
-                                                {acc.type === 'credit' ? (
-                                                    <>
-                                                        <div className="text-sm text-rose-400">
-                                                            Usado: <DualCurrency
-                                                                amount={acc.usedCredit}
-                                                                currency={acc.currency}
-                                                                exchangeRate={exchangeRate}
-                                                                displayCurrency="NIO"
-                                                                size="sm"
-                                                            />
-                                                        </div>
-                                                        <div className="text-xs text-slate-500">
-                                                            Disponible: <DualCurrency
-                                                                amount={acc.availableCredit || 0}
-                                                                currency={acc.currency}
-                                                                exchangeRate={exchangeRate}
-                                                                displayCurrency="NIO"
-                                                                size="sm"
-                                                            />
-                                                        </div>
-                                                    </>
-                                                ) : (
-                                                    <DualCurrency
-                                                        amount={acc.balance}
-                                                        currency={acc.currency}
-                                                        exchangeRate={exchangeRate}
-                                                        displayCurrency="NIO"
-                                                        size="sm"
-                                                        className={acc.balance < 0 ? 'text-red-400' : 'text-emerald-400'}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {summary?.accounts?.filter(acc => acc.balance !== 0).slice(0, 8).map(acc => (
+                                <div
+                                    key={acc.id}
+                                    className="p-4 bg-slate-950/40 rounded-xl border border-slate-800/40 flex flex-col justify-between hover:border-slate-700 transition-colors group"
+                                >
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-2 h-2 rounded-full shrink-0 shadow-[0_0_8px_rgba(0,0,0,0.5)]" style={{ backgroundColor: acc.color }}></div>
+                                        <span className="text-[11px] font-bold text-slate-200 leading-snug group-hover:text-white transition-colors">
+                                            {acc.name}
+                                        </span>
                                     </div>
-                                ))}
-
-                                {(!summary?.accounts || summary.accounts.length === 0) && (
-                                    <div className="text-center text-slate-500 py-4">
-                                        <Wallet size={32} className="mx-auto mb-2 opacity-50" />
-                                        <p className="text-sm">No tienes cuentas</p>
-                                        <Link
-                                            to="/flowcontrol/accounts"
-                                            className="text-indigo-400 text-sm hover:underline"
-                                        >
-                                            Crear primera cuenta
-                                        </Link>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Forecast Preview */}
-                        <div className="bg-slate-900 overflow-hidden rounded-xl border border-slate-800">
-                            <div className="p-4 bg-slate-800/50 border-b border-slate-700 flex items-center justify-between">
-                                <h3 className="font-bold text-white flex items-center gap-2">
-                                    <Clock size={18} className="text-indigo-400" /> Próximos Movimientos
-                                </h3>
-                                <span className="text-[10px] uppercase bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded font-bold">Preview</span>
-                            </div>
-                            <div className="p-5 space-y-6">
-                                {/* Next 7 Days */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-semibold text-slate-300">Siguiente 7 días</span>
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${((summary?.next7DaysIncome || 0) - (summary?.next7DaysExpense || 0)) >= 0
-                                                ? 'bg-emerald-500/10 text-emerald-400'
-                                                : 'bg-rose-500/10 text-rose-400'
-                                                }`}>
-                                                Neto: C$ {((summary?.next7DaysIncome || 0) - (summary?.next7DaysExpense || 0)).toLocaleString()}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
-                                            <span className="text-[10px] uppercase text-emerald-500 block mb-1">Ingresos</span>
+                                    <div className="flex items-end justify-between gap-3 mt-auto">
+                                        <span className="text-[9px] text-slate-600 uppercase font-bold tracking-tighter">
+                                            {acc.currency} • {acc.type}
+                                        </span>
+                                        <div className="text-right">
                                             <DualCurrency
-                                                amount={summary?.next7DaysIncome || 0}
-                                                currency="NIO"
+                                                amount={acc.balance}
+                                                currency={acc.currency}
                                                 exchangeRate={exchangeRate}
-                                                displayCurrency="NIO"
+                                                displayCurrency={displayCurrency}
                                                 size="sm"
-                                                className="text-white font-bold"
-                                            />
-                                        </div>
-                                        <div className="p-3 bg-slate-800/40 rounded-lg border border-slate-700/50">
-                                            <span className="text-[10px] uppercase text-rose-500 block mb-1">Egresos</span>
-                                            <DualCurrency
-                                                amount={summary?.next7DaysExpense || 0}
-                                                currency="NIO"
-                                                exchangeRate={exchangeRate}
-                                                displayCurrency="NIO"
-                                                size="sm"
-                                                className="text-white font-bold"
+                                                className={acc.balance < 0 ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}
                                             />
                                         </div>
                                     </div>
                                 </div>
+                            ))}
+                        </div>
+                    </div>
 
-                                {/* Remaining Month */}
-                                <div className="pt-4 border-t border-slate-800 space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-semibold text-slate-300">Restante del Mes</span>
-                                        <span className="text-[10px] text-slate-500 italic">Corte: {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString('es-NI', { day: '2-digit', month: 'short' })}</span>
+                    {/* Movements List - 5 cols */}
+                    <div className="lg:col-span-5 bg-slate-900/40 p-6 rounded-2xl border border-slate-800 shadow-sm">
+                        <div className="flex items-center gap-2 mb-6">
+                            <div className="p-1.5 bg-amber-500/10 rounded-lg">
+                                <Clock size={16} className="text-amber-400" />
+                            </div>
+                            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Próximos Movimientos</h3>
+                        </div>
+                        <div className="space-y-4">
+                            <div className="flex flex-col gap-2 p-4 bg-slate-950/40 rounded-xl border border-slate-800/40">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Vencimientos 7 Días</span>
+                                    <div className="text-right">
+                                        <DualCurrency
+                                            amount={(summary?.next7DaysIncome || 0) - (summary?.next7DaysExpense || 0)}
+                                            currency="NIO"
+                                            exchangeRate={exchangeRate}
+                                            displayCurrency={displayCurrency}
+                                            size="sm"
+                                            className={((summary?.next7DaysIncome || 0) - (summary?.next7DaysExpense || 0)) >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}
+                                        />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] uppercase text-slate-500 block">Total Ingresos</span>
-                                            <DualCurrency
-                                                amount={summary?.remainingMonthIncome || 0}
-                                                currency="NIO"
-                                                exchangeRate={exchangeRate}
-                                                displayCurrency="NIO"
-                                                size="sm"
-                                                className="text-slate-300"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <span className="text-[10px] uppercase text-slate-500 block">Total Gastos</span>
-                                            <DualCurrency
-                                                amount={summary?.remainingMonthExpense || 0}
-                                                currency="NIO"
-                                                exchangeRate={exchangeRate}
-                                                displayCurrency="NIO"
-                                                size="sm"
-                                                className="text-slate-300"
-                                            />
-                                        </div>
+                                </div>
+                                <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden mt-1">
+                                    <div className={`h-full rounded-full ${((summary?.next7DaysIncome || 0) - (summary?.next7DaysExpense || 0)) >= 0 ? 'bg-emerald-500/30' : 'bg-rose-500/30'}`} style={{ width: '65%' }}></div>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2 p-4 bg-slate-950/40 rounded-xl border border-slate-800/40">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                        <span className="text-[9px] text-slate-500 uppercase font-black tracking-widest">Cierre de Mes</span>
+                                        <span className="text-[10px] text-indigo-400 font-bold uppercase">
+                                            {new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toLocaleDateString('es-NI', { day: '2-digit', month: 'long' })}
+                                        </span>
+                                    </div>
+                                    <div className="text-right">
+                                        <DualCurrency
+                                            amount={(summary?.remainingMonthIncome || 0) - (summary?.remainingMonthExpense || 0)}
+                                            currency="NIO"
+                                            exchangeRate={exchangeRate}
+                                            displayCurrency={displayCurrency}
+                                            size="md"
+                                            className="text-indigo-400 font-bold"
+                                        />
                                     </div>
                                 </div>
                             </div>

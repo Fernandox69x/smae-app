@@ -597,6 +597,7 @@ export class FlowControlService {
         // Pending transactions ordered by date
         const endDate = new Date(today);
         endDate.setDate(endDate.getDate() + days);
+        endDate.setHours(23, 59, 59, 999);
 
         const pending = await prisma.transaction.findMany({
             where: {
@@ -614,17 +615,12 @@ export class FlowControlService {
         const chartData = [];
         let runningBalance = currentBalance;
 
-        // Current start point
-        chartData.push({
-            date: today.toISOString().split('T')[0],
-            balance: Math.round(runningBalance)
-        });
-
         // Project day by day
-        for (let i = 1; i <= days; i++) {
+        for (let i = 0; i <= days; i++) {
             const date = new Date(today);
             date.setDate(date.getDate() + i);
             const dateStr = date.toISOString().split('T')[0];
+            const milestones: any[] = [];
 
             // Add transactions for this day
             const daysTxs = pending.filter(tx => {
@@ -633,10 +629,17 @@ export class FlowControlService {
             });
 
             daysTxs.forEach(tx => {
-                runningBalance += this.convertToNio(Number(tx.amount), tx.currency, Number(tx.exchangeRate || exchangeRate));
+                const amountNio = this.convertToNio(Number(tx.amount), tx.currency, Number(tx.exchangeRate || exchangeRate));
+                runningBalance += amountNio;
+                milestones.push({
+                    description: tx.description,
+                    amount: Number(tx.amount),
+                    currency: tx.currency,
+                    type: amountNio >= 0 ? 'income' : 'expense'
+                });
             });
 
-            // Restar pagos de préstamos si coincide el día Y el préstamo ya comenzó a cobrarse
+            // Restar pagos de préstamos
             activeLoans.forEach(loan => {
                 const firstPayment = (loan as any).firstPaymentDate ? new Date((loan as any).firstPaymentDate) : null;
                 const isAfterOrEqualFirstPayment = !firstPayment ||
@@ -644,14 +647,25 @@ export class FlowControlService {
                     (date.getFullYear() === firstPayment.getFullYear() && date.getMonth() >= firstPayment.getMonth());
 
                 if (date.getDate() === loan.paymentDay && isAfterOrEqualFirstPayment) {
-                    runningBalance -= this.convertToNio(Number(loan.monthlyPayment), loan.currency, exchangeRate);
+                    const amountNio = this.convertToNio(Number(loan.monthlyPayment), loan.currency, exchangeRate);
+                    runningBalance -= amountNio;
+                    milestones.push({
+                        description: `Pago Préstamo: ${loan.name || 'Sin nombre'}`,
+                        amount: -Number(loan.monthlyPayment),
+                        currency: loan.currency,
+                        type: 'loan'
+                    });
                 }
             });
 
-            chartData.push({
-                date: dateStr,
-                balance: Math.round(runningBalance)
-            });
+            // Solo agregamos al chart si es el día 0 (hoy) o si hubo hitos
+            if (i === 0 || milestones.length > 0 || i === days) {
+                chartData.push({
+                    date: dateStr,
+                    balance: Math.round(runningBalance),
+                    milestones
+                });
+            }
         }
 
         return chartData;
